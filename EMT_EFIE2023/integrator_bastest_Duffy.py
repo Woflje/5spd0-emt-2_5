@@ -65,18 +65,25 @@ class integrator_bastest():
         
         Int = 0
         num_j = np.complex128(0+1j) #again define the imaginairy unit
-        
         #double summation over the triangle, for every y_prime there will be length points in the triangle. 
-        for i in range(length):
-            for j in range(length):
-                U = U_low[j]*(1-zeta_new[i])+U_up[j]*zeta_new[i] #U points for triangle domain
-                R = np.sqrt(yp[j]**2+z**2)*np.cosh(U) #This is the R equation to cancle singularity. See method duffy for reference.
-                
-                #x_test[i][j] = np.sqrt(R[i][j]**2-yp[j]**2)
-                x_p = np.sqrt(yp[j]**2+z**2)*np.sinh(U) #x_prime location. needed to determine r_prime.
-                rp = np.add(np.add(r0,np.multiply(x_p,x_hat)),np.multiply(yp[j],h1_hat)) #determine r_prime to be able to know where we are in actual coordinates instead of our own coordinate system
-                const =  weight_new[i]*weight_new[j]*fnp.fastNorm(h1)*(U_up[j]-U_low[j]) #constant term see method duffy for reference
-                Int += np.dot(n,n_hat)*const*Func(rp)*1/(4*np.pi)*np.exp(-num_j*self.k*R) #multiply everything and with the scalar green function without its singularity. 
+        #i is rows, j is columns
+        #test solution
+        U_test = (1-np.reshape(zeta_new,(len(zeta_new),1)))*U_low + np.reshape(zeta_new,(len(zeta_new),1))*U_up
+        R_test = np.sqrt(yp**2+z**2)*np.cosh(U_test)
+        x_p_test = np.sqrt(yp**2+z**2)*np.sinh(U_test)
+        rp_test = np.add(np.add(np.reshape([r0,r0,r0,r0,r0,r0,r0,r0,r0,r0,r0,r0,r0,r0,r0,r0,r0,r0,r0,r0,r0,r0,r0,r0,r0],(5,15)),np.kron(x_hat,x_p_test)),np.kron(h1_hat,yp))
+        const_test =  np.reshape(weight_new,(len(weight_new),1))*weight_new*fnp.fastNorm(h1)*(U_up-U_low)
+        Int = np.sum(np.multiply(np.dot(n,n_hat)*np.multiply(const_test,Func(rp_test))*1/(4*np.pi),np.exp(-num_j*self.k*R_test)))
+        #working solution
+        #for i in range(length):
+        #    for j in range(length):
+        #        U = U_low[j]*(1-zeta_new[i])+U_up[j]*zeta_new[i] #U points for triangle domain
+        #        R = np.sqrt(yp[j]**2+z**2)*np.cosh(U) #This is the R equation to cancle singularity. See method duffy for reference.
+        #        #x_test[i][j] = np.sqrt(R[i][j]**2-yp[j]**2)
+        #        x_p = np.sqrt(yp[j]**2+z**2)*np.sinh(U) #x_prime location. needed to determine r_prime.
+        #        rp = np.add(np.add(r0,np.multiply(x_p,x_hat)),np.multiply(yp[j],h1_hat)) #determine r_prime to be able to know where we are in actual coordinates instead of our own coordinate system
+        #        const =  weight_new[i]*weight_new[j]*fnp.fastNorm(h1)*(U_up[j]-U_low[j]) #constant term see method duffy for reference
+        #        Int += np.dot(n,n_hat)*const*Func(rp)*1/(4*np.pi)*np.exp(-num_j*self.k*R) #multiply everything and with the scalar green function without its singularity. 
         return Int
     
     
@@ -96,12 +103,11 @@ class integrator_bastest():
         A2 = Integrate.area_triangle(T2) #area of triangle 2
         A = Integrate.area_triangle(T1) #area of triangle 1
         
-        
-        basis = lambda r,rp: length2/(2*A2)*(np.subtract(rp,T2[2])) #define basis function
+        basis = lambda r,rp: length2/(2*A2)*(np.subtract(rp,np.reshape([T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2]],(25,3)))) #define basis function
         Test = lambda r,rp: length1/(2*A)*(np.subtract(r,T1[2])) #define test function
         
-        Div_basis_test = lambda r,rp: 1/(num_j*self.k)*length2/A2*length1/A #Divergence of test function, scalar so no need to make it a function
-        basis_test = lambda r,rp: num_j*self.k*np.dot(basis(r,rp),Test(r,rp)) #function for the dot product of the tes and basis function. Easy way of implementing when providing both in first triangle, r will not matter as second triangle is only dependend on rp.
+        Div_basis_test = lambda r,rp: 1/(num_j*self.k)*length2/A2*length1/A # Divergence of test function, scalar so no need to make it a function
+        basis_test = lambda r,rp: np.reshape(num_j*self.k*np.dot(basis(r,np.reshape(rp,(25,3))),Test(r,rp)),(5,5)) #function for the dot product of the tes and basis function. Easy way of implementing when providing both in first triangle, r will not matter as second triangle is only dependend on rp.
         
 
         proj = lambda r: np.add(r,np.multiply(np.divide(np.dot(n,np.subtract(T2[0],r)),fnp.fastNorm(n)**2),n)) #Function to calculate the location of the obervation point projected on triangle 2.
