@@ -436,7 +436,77 @@ class Mesh:
         plt.show()
 
         return
+    def prepare_plot_data(self, normals=False):
+        # Initialize lists to accumulate all coordinates for determining plot limits
+        all_x, all_y, all_z = [], [], []
+        
+        self.plot_data = []
+        edge_lengths = []  # Collect all edge lengths to determine padding based on the largest edge length
 
+        for obj in self.objects:
+            vertices_data, mean_normals = [], []
+            
+            for triangle in obj.triangles:
+                vertices = np.array([point for point in triangle.points])
+                all_x.extend(vertices[:, 0])
+                all_y.extend(vertices[:, 1])
+                all_z.extend(vertices[:, 2])
+                
+                if normals:
+                    mean_x, mean_y, mean_z = np.mean(vertices[:, 0]), np.mean(vertices[:, 1]), np.mean(vertices[:, 2])
+                    normal = triangle.normal
+                    edge_length = np.sqrt(np.sum(np.square(obj.edges[0].vertex1 - obj.edges[0].vertex2)))
+                    edge_lengths.append(edge_length)
+                    mean_normals.append((mean_x, mean_y, mean_z, *normal, edge_length * 0.5))
+
+                vertices_data.append({'vertices': vertices, 'normal': triangle.normal if normals else None})
+
+            self.plot_data.append({'vertices_data': vertices_data, 'mean_normals': mean_normals if normals else None})
+
+        if edge_lengths:
+            max_edge_length = max(edge_lengths)
+        else:
+            max_edge_length = 1  # Default to 1 if no edges (unlikely, but safe fallback)
+
+        # Determine the plot limits based on accumulated coordinates
+        boundary_padding = max_edge_length * 0.1
+        self.plot_limits = {
+            'x': [min(all_x) - boundary_padding, max(all_x) + boundary_padding],
+            'y': [min(all_y) - boundary_padding, max(all_y) + boundary_padding],
+            'z': [min(all_z) - boundary_padding, max(all_z) + boundary_padding]
+        }
+
+        # Prepare self.array1_reshape based on all vertices
+        if all_x and all_y and all_z:  # Ensure there is data to process
+            all_vertices = np.array([all_x, all_y, all_z]).T
+            self.array1_reshape = all_vertices.reshape(-1, 9)  # Assuming this matches the original intent
+
+
+    def plot_objects(self):
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        
+        for obj_data in self.plot_data:
+            for triangle_data in obj_data['vertices_data']:
+                vertices = triangle_data['vertices']
+                x, y, z = vertices[:,0], vertices[:,1], vertices[:,2]
+
+                # Plot the triangles
+                ax.plot_trisurf(x, y, z, linewidth=0.2, color='blue', edgecolor='black', shade=True)
+            
+            if 'mean_normals' in obj_data and obj_data['mean_normals']:
+                for mean_x, mean_y, mean_z, nx, ny, nz, length in obj_data['mean_normals']:
+                    ax.quiver(mean_x, mean_y, mean_z, nx, ny, nz, length=length, color='red')
+        
+        # Set axes limits
+        ax.set_xlim(*self.plot_limits['x'])
+        ax.set_ylim(*self.plot_limits['y'])
+        ax.set_zlim(*self.plot_limits['z'])
+
+        ax.set_xlabel('X axis')
+        ax.set_ylabel('Y axis')
+        ax.set_zlabel('Z axis')
+        plt.show()
     def getmatrix(self):
 
         # TRIANGLE AREAS
@@ -712,10 +782,9 @@ class Mesh:
         
 
         # Set the boundaries based on earlier calculated limits (see mesh.plot())
-        ax.set_xlim(self.plot_limits[0], self.plot_limits[1])
-        ax.set_ylim(self.plot_limits[2], self.plot_limits[3])
-        ax.set_zlim(self.plot_limits[4], self.plot_limits[5])
-
+        ax.set_xlim(*self.plot_limits['x'])
+        ax.set_ylim(*self.plot_limits['y'])
+        ax.set_zlim(*self.plot_limits['z'])
         ax.set_xlabel('X axis')
         ax.set_ylabel('Y axis')
         ax.set_zlabel('Z axis')
