@@ -13,7 +13,7 @@ start_time=time.perf_counter()
 
 ############ SET INPUT PARAMETERS###################
 wavelength = 100
-input_mesh = "examples/sphere_z_offset.dat"
+input_mesh = "examples/tetrahedron.dat"
 input_EFIELD_AMPLITUDE = 1
 input_EFIELD_DIRECTION = [np.pi/4,np.pi/4]  #angle: phi, theta
 input_EFIELD_POLARIZATION = np.pi/4  #angle of polarization relative to phi and theta
@@ -38,7 +38,8 @@ duffy = EJHM_Duffy.integrator_bastest(k,5,5)
 
 # Initialize the code which creates the mesh of the input object and sorts all edges
 mesh = Mesh(input_mesh, True)
-mesh.plot()  # Always run .plot() because the edge sorting is done here
+mesh.prepare_plot_data()  # Always run .plot() because the edge sorting is done here
+# mesh.plot_objects()
 [length, e_vertice, other_vertice, area] = mesh.getmatrix()
 N = len(e_vertice)
 
