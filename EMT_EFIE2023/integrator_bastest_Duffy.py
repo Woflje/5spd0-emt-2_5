@@ -9,10 +9,72 @@ class integrator_bastest():
     def __init__(self,k,order_duffy,order_dunavant):
         print("Initialize integration Duffy method")
         self.k = k # wave vector
-        self.order_duffy = order_duffy #oder of the duffy method
+        self.order_duffy = order_duffy #order of the duffy method
         self.order_dunavant = order_dunavant #order of the dunvant method
         
         #Function that computes the integral over one subdomain. If called three times the whole triangle is integrated using duffy
+
+    def EvaluateSubtriangle2(self,r0,r1,r2,z,n,func):
+        # lengths of sides
+        l1,l2,l3=r2-r1, r0-r2, r1-r0
+
+        # cross products
+        cross = [fnp.fastCross(l1,l2), fnp.fastCross(l2,l3), fnp.fastCross(l3,l1)]
+        norms = [fnp.fastNorm(x) for x in cross]
+        
+        # find the first non-zero normal vector
+        n_hat = next((x/norm for x, norm in zip(cross, norms) if norm != 0), None)
+        if n_hat is None:
+            return 0 # Sides are collinear, no valid subtriangle
+        
+        # Subdomain area
+        A_sub = np.dot(n_hat, cross[0])/2
+        
+        # Subdomain height
+        h1 = 2*A_sub/np.square(fnp.fastNorm(l1))*fnp.fastCross(l1, n_hat)
+        h1_norm = fnp.fastNorm(h1)
+        h1_hat = h1/h1_norm
+
+        # Prepare Gauss-Legendre Quadrature
+        Gauss = np.polynomial.legendre.leggauss(self.order_duffy)
+        weight_new = 0.5*Gauss[1]
+        zeta_new = 0.5*(Gauss[0]+1)
+        zeta_new_ = 1-zeta_new
+
+        # x_hat direction
+        x_hat = fnp.fastCross(h1_hat,n_hat)
+
+        # Prepare yp (y_prime)
+        yp = h1_norm*(1-zeta_new)
+
+        # Prepare effective radius
+        r_eff = np.sqrt(yp**2+z**2)
+
+        # Lower and upper bounds
+        x_low = np.dot(n_hat, fnp.fastCross(h1_hat,l2))*zeta_new_
+        x_up = -np.dot(n_hat, fnp.fastCross(h1_hat,l3))*zeta_new_
+        U_low = np.arcsinh(x_low/r_eff)
+        U_up = np.arcsinh(x_up/r_eff)
+
+        # Double summation
+        U = np.outer(zeta_new_, U_low) + np.outer(zeta_new, U_up)
+        R = r_eff*np.cosh(U)
+        x_p = r_eff*np.sinh(U)
+        # rp = r0 + np.outer(x_p, x_hat) + np.outer(yp, h1_hat)
+
+        # rp and dimension struggle
+        r0_expanded = np.expand_dims(r0, axis=0)
+        rp = r0_expanded + np.tensordot(x_p, x_hat, axes=0) + np.outer(yp, h1_hat).reshape(-1,1,3)
+
+        # Integration constant
+        const = np.outer(weight_new, weight_new)*h1_norm*(U_up-U_low)
+
+        # Final integration
+        Int = np.sum((np.dot(n,n_hat)*const*func(rp)/(4*np.pi)*np.exp(-1j*self.k*R)).real)
+        # Int = np.sum((np.dot(n,n_hat)*const*func(rp)/(4*np.pi)*np.exp(-1j*self.k*R)))
+
+        return Int
+
     def EvaluateSubtriangle(self,r0,r1,r2,z,n,Func):
         
         
@@ -38,7 +100,6 @@ class integrator_bastest():
         
         Ap = np.dot(n_hat,cross1)/2 #area of subdomain
         h1 = np.multiply(2*Ap/(fnp.fastNorm(l1)**2),fnp.fastCross(l1,n_hat)) #height of subdomain. This will be along the y in our new coordinate system.  
-        
         
         
         Gauss = np.polynomial.legendre.leggauss(self.order_duffy) #obtain weights and values for our gauss legendre polynomial of the given order
@@ -103,7 +164,8 @@ class integrator_bastest():
         A2 = Integrate.area_triangle(T2) #area of triangle 2
         A = Integrate.area_triangle(T1) #area of triangle 1
         
-        basis = lambda r,rp: length2/(2*A2)*(np.subtract(rp,np.reshape([T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2]],(25,3)))) #define basis function
+        # basis = lambda r,rp: length2/(2*A2)*(np.subtract(rp,np.reshape([T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2],T2[2]],(25,3)))) #define basis function
+        basis = lambda r, rp: length2 / (2*A2) * (rp-T2[2])
         Test = lambda r,rp: length1/(2*A)*(np.subtract(r,T1[2])) #define test function
         
         Div_basis_test = lambda r,rp: 1/(num_j*self.k)*length2/A2*length1/A # Divergence of test function, scalar so no need to make it a function
@@ -118,12 +180,12 @@ class integrator_bastest():
         
         #Function to integrate the first integral this is the hypersingular equation where the divergences are taken into account. Therefroe the function given is 1 as the divergence is multiplied later as this is a constant.
         #The summation is implemented three times to calculate all the three domains of triangle 2 using duffy.
-        Int_triangle = lambda r: self.EvaluateSubtriangle(proj(r),T2[1],T2[2],z(r),n,lambda rp: Div_basis_test(r,rp)) + self.EvaluateSubtriangle(proj(r),T2[2],T2[0],z(r),n,lambda rp: Div_basis_test(r,rp)) + self.EvaluateSubtriangle(proj(r),T2[0],T2[1],z(r),n,lambda rp: Div_basis_test(r,rp))
+        Int_triangle = lambda r: self.EvaluateSubtriangle2(proj(r),T2[1],T2[2],z(r),n,lambda rp: Div_basis_test(r,rp)) + self.EvaluateSubtriangle2(proj(r),T2[2],T2[0],z(r),n,lambda rp: Div_basis_test(r,rp)) + self.EvaluateSubtriangle2(proj(r),T2[0],T2[1],z(r),n,lambda rp: Div_basis_test(r,rp))
         I_HS = Integrate.int_triangle(Int_triangle,T1)
         
         
         #Function to integrate the second integral the Singular integral, here the basis and test function are given. This needs to be done three times for all the three triangular domains for duffy.
-        Int_triangle2 = lambda r: self.EvaluateSubtriangle(proj(r),T2[1],T2[2],z(r),n,lambda rp: basis_test(r,rp)) + self.EvaluateSubtriangle(proj(r),T2[2],T2[0],z(r),n,lambda rp: basis_test(r,rp)) + self.EvaluateSubtriangle(proj(r),T2[0],T2[1],z(r),n,lambda rp: basis_test(r,rp))
+        Int_triangle2 = lambda r: self.EvaluateSubtriangle2(proj(r),T2[1],T2[2],z(r),n,lambda rp: basis_test(r,rp)) + self.EvaluateSubtriangle2(proj(r),T2[2],T2[0],z(r),n,lambda rp: basis_test(r,rp)) + self.EvaluateSubtriangle2(proj(r),T2[0],T2[1],z(r),n,lambda rp: basis_test(r,rp))
         I_S = Integrate.int_triangle(Int_triangle2,T1)
             
         
