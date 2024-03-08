@@ -93,7 +93,7 @@ while n<N:  # Loop through all basis functions
                 A[n, i] = A[n, i] + 4*np.pi*dunavant.int_bastest(np.array([r_vect[n, 0], r_vect[n, 1], r_vect[n, 2]]), np.array([r_vect[i, 0], r_vect[i, 1], r_vect[i, 2]]))
                 if not timed_4:
                     timer_4_end_time=dt.now()
-                    print("Timer 4 - Main.py duffy: ",str(timer_4_end_time-timer_4_start_time))
+                    print("Timer 4 - Main.py dunuvant: ",str(timer_4_end_time-timer_4_start_time))
                     timed_4=True
             if EF.check_sing(r_vect[n,0], r_vect[n,1], r_vect[n,2], r_vect[i,0], r_vect[i,1], r_vect[i,3]):
                 A[n,i] = A[n,i] - 4*np.pi*duffy.int_bastest(np.array([r_vect[n,0], r_vect[n,1], r_vect[n,2]]), np.array([r_vect[i,0], r_vect[i,1], r_vect[i,3]]))
