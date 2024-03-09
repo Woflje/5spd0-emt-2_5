@@ -40,15 +40,15 @@ duffy = EJHM_Duffy.integrator_bastest(k,5,5)
 mesh = Mesh(input_mesh, True)
 mesh.prepare_plot_data()  # Always run .plot() because the edge sorting is done here
 # mesh.plot_objects()
-[length, e_vertice, other_vertice, area] = mesh.getmatrix()
-N = len(e_vertice)
+[length, e_vertex, other_vertex, area] = mesh.getmatrix()
+N = len(e_vertex)
 
 # Load all edges in r_vect with a xyz for each of the 3 vertices of a Triangle
 #  r_vect has N elements for each inner edge with 4 vertices: 0 and 1 for the inner edge and 2 and 3 for the two other vertices that make the 2 triangles
 r_vect = np.empty([N,4,3])  # Position vectors of the basis and test functions
 n = 0
 while n<N:
-    r_vect[n] = np.array([np.array([e_vertice[n,0], e_vertice[n,1], e_vertice[n,2]]), np.array([e_vertice[n,3], e_vertice[n,4], e_vertice[n,5]]), np.array([other_vertice[n,0], other_vertice[n,1], other_vertice[n,2]]), np.array([other_vertice[n,3], other_vertice[n,4], other_vertice[n,5]])])
+    r_vect[n] = np.array([np.array([e_vertex[n,0], e_vertex[n,1], e_vertex[n,2]]), np.array([e_vertex[n,3], e_vertex[n,4], e_vertex[n,5]]), np.array([other_vertex[n,0], other_vertex[n,1], other_vertex[n,2]]), np.array([other_vertex[n,3], other_vertex[n,4], other_vertex[n,5]])])
     n = n+1  #update within array of vertices
 
 # Create and integrate the incomming Efield
@@ -63,7 +63,7 @@ while n<N:
     n=n+1
 
 # Plot the incident electric field over the inner edges
-mesh.plot_current(E,e_vertice,input_EFIELD_DIRECTION,input_EFIELD_POLARIZATION)
+mesh.plot_current(E,e_vertex,input_EFIELD_DIRECTION,input_EFIELD_POLARIZATION)
 
 # Create system Matrix
 A = (N,N)
@@ -124,7 +124,7 @@ A = A+np.transpose(A)-np.diag(np.diag(A)) #this is an approximation but saves a 
 J = np.dot(np.linalg.inv(A),E)
 
 # Plot the currents over the inner edges
-mesh.plot_current(J, e_vertice, input_EFIELD_DIRECTION, input_EFIELD_POLARIZATION)
+mesh.plot_current(J, e_vertex, input_EFIELD_DIRECTION, input_EFIELD_POLARIZATION)
 #%%
 # Start of the post-processing
 n = 0
