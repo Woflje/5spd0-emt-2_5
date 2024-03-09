@@ -723,7 +723,7 @@ class Mesh:
         return inner_edges_length, inner_edges, no_inner_edges, area_triangle
 
 
-    def plot_current(self, currents_on_edge, e_vertice, dir,polarization): # Function to plot the current/Efield values over the edges
+    def plot_current(self, currents_on_edge, e_vertex, dir,polarization): # Function to plot the current/Efield values over the edges
 
         # Create a colour map to assign colours to the current value
         mappie = cm.get_cmap('plasma')
@@ -737,8 +737,8 @@ class Mesh:
         ax = fig.add_subplot(111, projection='3d')
 
         # Plot each edge with its colour based on the colour map
-        for i in range(len(e_vertice)):
-            ax.plot([e_vertice[i,0], e_vertice[i,3]], [e_vertice[i,1], e_vertice[i,4]], [e_vertice[i,2], e_vertice[i,5]], c=mappie(float(currents_on_edge[i])), linewidth=2, linestyle='solid')
+        for i in range(len(e_vertex)):
+            ax.plot([e_vertex[i,0], e_vertex[i,3]], [e_vertex[i,1], e_vertex[i,4]], [e_vertex[i,2], e_vertex[i,5]], c=mappie(float(currents_on_edge[i])), linewidth=2, linestyle='solid')
 
         # Calculate the k-vector and polarization of the incoming field to also plot this for a better understanding of the situation
 
