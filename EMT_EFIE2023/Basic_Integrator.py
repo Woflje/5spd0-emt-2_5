@@ -2,7 +2,7 @@ import numpy as np
 import scipy
 from FastNP import fastNorm
 
-import Dunavant_Values
+import Dunavant
  
 
 class Basic_Integrator():
@@ -13,17 +13,17 @@ class Basic_Integrator():
         #function that calculates the area of a triangle 
     def area_triangle(self,T):
         #lengths of all sides of the given triangle T
-        l1 = fastNorm(np.subtract(T[1],T[0]))
-        l2 = fastNorm(np.subtract(T[0],T[2]))
-        l3 = fastNorm(np.subtract(T[2],T[1]))
-        A = 1/4*np.sqrt(4*l1**2*l2**2-(l1**2+l2**2-l3**2)**2) #standard formula to calculate area of a traingle
-        return A          
+        l1 = fastNorm(T[:, 1] - T[:, 0])
+        l2 = fastNorm(T[:, 0] - T[:, 2])
+        l3 = fastNorm(T[:, 2] - T[:, 1])
+        A = 1/4*np.sqrt(4*l1**2*l2**2-(l1**2+l2**2-l3**2)**2)
+        return A             
      
         #Function that integrates a scalar green function over a triangle 
     def int_triangle(self,Phi,T):
         A_tot = self.area_triangle(T) #determine area of triangle
-        DunPolys = Dunavant_Values.PolyDun() #Initailize function to obtain dunnavant values
-        weight, alpha, beta, gamma, ng, rot = DunPolys.Dunavant_Values(self.order) #obtain the dunvanat values of the given order
+        DunPolys = Dunavant.PolyDunavant() #Initailize function to obtain dunnavant values
+        weight, alpha, beta, gamma, ng = DunPolys.get_values(P=self.order) #obtain the dunvanat values of the given order
         #temp = 0;
         
         #Integral over triangle T with a scalar function according to dunavant method in barycentric coordinates.
@@ -40,12 +40,4 @@ class Basic_Integrator():
         
         Itest = self.int_triangle(scalar,T) #Integrate the new scalar function using the int_triangle function.
         
-        return Itest        
-        
-
-    
-    
-
-
-    
-
+        return Itest
