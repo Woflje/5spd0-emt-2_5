@@ -6,14 +6,14 @@ import Basic_Integrator as simple_int
 import EFIE_functions as EF
 from Mesh import Mesh
 from datetime import datetime as dt
-
+from scipy.io import savemat
 import time
 
 start_time=time.perf_counter()
 
 ############ SET INPUT PARAMETERS###################
 wavelength = 100
-input_mesh = "examples/sphere_z_offset.dat"
+input_mesh = "examples/tetrahedron.dat"
 input_EFIELD_AMPLITUDE = 1
 input_EFIELD_DIRECTION = [np.pi/4,np.pi/4]  #angle: phi, theta
 input_EFIELD_POLARIZATION = np.pi/4  #angle of polarization relative to phi and theta
@@ -38,16 +38,17 @@ duffy = EJHM_Duffy.integrator_bastest(k,5,5)
 
 # Initialize the code which creates the mesh of the input object and sorts all edges
 mesh = Mesh(input_mesh, True)
-mesh.plot()  # Always run .plot() because the edge sorting is done here
-[length, e_vertice, other_vertice, area] = mesh.getmatrix()
-N = len(e_vertice)
+mesh.prepare_plot_data()  # Always run .plot() because the edge sorting is done here
+# mesh.plot_objects()
+[length, e_vertex, other_vertex, area] = mesh.getmatrix()
+N = len(e_vertex)
 
 # Load all edges in r_vect with a xyz for each of the 3 vertices of a Triangle
 #  r_vect has N elements for each inner edge with 4 vertices: 0 and 1 for the inner edge and 2 and 3 for the two other vertices that make the 2 triangles
 r_vect = np.empty([N,4,3])  # Position vectors of the basis and test functions
 n = 0
 while n<N:
-    r_vect[n] = np.array([np.array([e_vertice[n,0], e_vertice[n,1], e_vertice[n,2]]), np.array([e_vertice[n,3], e_vertice[n,4], e_vertice[n,5]]), np.array([other_vertice[n,0], other_vertice[n,1], other_vertice[n,2]]), np.array([other_vertice[n,3], other_vertice[n,4], other_vertice[n,5]])])
+    r_vect[n] = np.array([np.array([e_vertex[n,0], e_vertex[n,1], e_vertex[n,2]]), np.array([e_vertex[n,3], e_vertex[n,4], e_vertex[n,5]]), np.array([other_vertex[n,0], other_vertex[n,1], other_vertex[n,2]]), np.array([other_vertex[n,3], other_vertex[n,4], other_vertex[n,5]])])
     n = n+1  #update within array of vertices
 
 # Create and integrate the incomming Efield
@@ -62,7 +63,7 @@ while n<N:
     n=n+1
 
 # Plot the incident electric field over the inner edges
-mesh.plot_current(E,e_vertice,input_EFIELD_DIRECTION,input_EFIELD_POLARIZATION)
+mesh.plot_current(E,e_vertex,input_EFIELD_DIRECTION,input_EFIELD_POLARIZATION)
 
 # Create system Matrix
 A = (N,N)
@@ -93,7 +94,7 @@ while n<N:  # Loop through all basis functions
                 A[n, i] = A[n, i] + 4*np.pi*dunavant.int_bastest(np.array([r_vect[n, 0], r_vect[n, 1], r_vect[n, 2]]), np.array([r_vect[i, 0], r_vect[i, 1], r_vect[i, 2]]))
                 if not timed_4:
                     timer_4_end_time=dt.now()
-                    print("Timer 4 - Main.py dunuvant: ",str(timer_4_end_time-timer_4_start_time))
+                    print("Timer 4 - Main.py duffy: ",str(timer_4_end_time-timer_4_start_time))
                     timed_4=True
             if EF.check_sing(r_vect[n,0], r_vect[n,1], r_vect[n,2], r_vect[i,0], r_vect[i,1], r_vect[i,3]):
                 A[n,i] = A[n,i] - 4*np.pi*duffy.int_bastest(np.array([r_vect[n,0], r_vect[n,1], r_vect[n,2]]), np.array([r_vect[i,0], r_vect[i,1], r_vect[i,3]]))
@@ -123,7 +124,7 @@ A = A+np.transpose(A)-np.diag(np.diag(A)) #this is an approximation but saves a 
 J = np.dot(np.linalg.inv(A),E)
 
 # Plot the currents over the inner edges
-mesh.plot_current(J, e_vertice, input_EFIELD_DIRECTION, input_EFIELD_POLARIZATION)
+mesh.plot_current(J, e_vertex, input_EFIELD_DIRECTION, input_EFIELD_POLARIZATION)
 #%%
 # Start of the post-processing
 n = 0
@@ -151,10 +152,15 @@ for a in range(np.size(input_FARFIELD_DIRECTION[0])):
 EF.plot_phi(input_FARFIELD_DIRECTION[0],E_farfield)
 EF.plot_theta(input_FARFIELD_DIRECTION[1],E_farfield)
 
+
+
 # Finalization of the code and delete of all integrator instances
 del dunavant
 del duffy
 del simple
+
+mymat={'E_farfield':E_farfield}
+#savemat("farfield_matrix.mat",mymat)
 
 end_time=time.perf_counter()
 print("time:",end_time-start_time)
