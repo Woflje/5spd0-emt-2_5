@@ -18,5 +18,4 @@ def fastCross(v1,v2):
     return np.reshape(s,(3)) #reshape result so the existing fucntions accept it
 
 def fastNorm(v):
-    s=np.sqrt(v[0]**2+v[1]**2+v[2]**2)
-    return s
+    return np.sqrt(np.sum(v**2, axis=-1))
