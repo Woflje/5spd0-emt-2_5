@@ -1,119 +1,131 @@
-# Import numpy, the integrator codes, extra functions and the mesh code
 import numpy as np
+
 import Integrator_bastest as EJHM
 import integrator_bastest_Duffy as EJHM_Duffy
 import Basic_Integrator as simple_int
 import EFIE_functions as EF
 from Mesh import Mesh
-from datetime import datetime as dt
 
-import time
+from Timer import Timer
 
-start_time=time.perf_counter()
+from parameters import parameters
+from E_field import E_field_essentials, E_field_in_points
+from integrators.dunavant.Dunavant import get_Dunavant_values
 
-############ SET INPUT PARAMETERS###################
-wavelength = 100
-input_mesh = "examples/tetrahedron.dat"
-input_EFIELD_AMPLITUDE = 1
-input_EFIELD_DIRECTION = [np.pi/4,np.pi/4]  #angle: phi, theta
-input_EFIELD_POLARIZATION = np.pi/4  #angle of polarization relative to phi and theta
-
-#input_FARFIELD_DIRECTION = np.array([np.linspace(0.001,2*np.pi,180), np.array([np.pi/2.])]) #angle: phi, theta
-input_FARFIELD_DIRECTION = [np.array([np.pi*2.]), np.linspace(0.001,2*np.pi,180)] #angle: phi, theta
-# input_FARFIELD_DIRECTION = np.array([np.array([np.pi*2.]), np.linspace(0.001,2*np.pi,180)]) #angle: phi, theta
-input_FARFIELD_POLARIZATION = np.array([0]) #angle of polarization relative to phi and theta
-
+from loose import calculate_triangle_area, restructure_mesh_rwg_data
 
 # Initialize the constants
-k = 2*np.pi/wavelength
+k = 2*np.pi/parameters["wavelength"]
 
+# Initialize dunavant values
+dunavant_values, dunavant_weight = get_Dunavant_values(parameters["order_dunavant"])
 
 # Intialize the integrators for the given wavelength
 dunavant = EJHM.integrator_bastest(k,5)
-simple = simple_int.Basic_Integrator(5)
 duffy = EJHM_Duffy.integrator_bastest(k,5,5)
 
-
-#%%
-
 # Initialize the code which creates the mesh of the input object and sorts all edges
-mesh = Mesh(input_mesh, True)
+mesh = Mesh(parameters["input_mesh_path"], True)
 mesh.prepare_plot_data()  # Always run .plot() because the edge sorting is done here
 # mesh.plot_objects()
-[length, e_vertex, other_vertex, area] = mesh.getmatrix()
-N = len(e_vertex)
 
 # Load all edges in r_vect with a xyz for each of the 3 vertices of a Triangle
 #  r_vect has N elements for each inner edge with 4 vertices: 0 and 1 for the inner edge and 2 and 3 for the two other vertices that make the 2 triangles
-r_vect = np.empty([N,4,3])  # Position vectors of the basis and test functions
-n = 0
-while n<N:
-    r_vect[n] = np.array([np.array([e_vertex[n,0], e_vertex[n,1], e_vertex[n,2]]), np.array([e_vertex[n,3], e_vertex[n,4], e_vertex[n,5]]), np.array([other_vertex[n,0], other_vertex[n,1], other_vertex[n,2]]), np.array([other_vertex[n,3], other_vertex[n,4], other_vertex[n,5]])])
-    n = n+1  #update within array of vertices
 
-# Create and integrate the incomming Efield
-E = np.zeros([N,1],dtype=np.complex128)
-def Efield_in(pos):
+[length, e_vertex, other_vertex, area] = mesh.getmatrix()
+N = len(e_vertex)
+
+r_vect = np.array([e_vertex[:, :3], e_vertex[:, 3:], other_vertex[:, :3], other_vertex[:, 3:]]).transpose(1, 0, 2)
+
+vertices, rwgs, areas, dunavant_positions = restructure_mesh_rwg_data(r_vect, dunavant_values)
+
+[E_in_k_vector, E_in_polarization] = E_field_essentials(k, parameters["input_E_field"]["direction"], parameters["input_E_field"]["polarization"])
+
+# Compute the electric field at all Dunavant points
+E_field_in = E_field_in_points(dunavant_positions, E_in_k_vector, E_in_polarization, parameters["input_E_field"]["amplitude"])
+
+# Vectorized selection of triangle indices for the first and second triangles of each RWG
+triangle_indices_first = rwgs[:, 4]
+triangle_indices_second = rwgs[:, 5]
+
+# Correct reshaping of dunavant_weight for broadcasting
+dunavant_weight_reshaped = dunavant_weight.reshape(1, -1, 1)  # Shape becomes (1, P, 1)
+
+# Recalculate E_contribution_first with the corrected weight shape
+E_contribution_first = np.sum(E_field_in[triangle_indices_first] * dunavant_weight_reshaped, axis=(1, 2)) * areas[triangle_indices_first]
+E_contribution_second = np.sum(E_field_in[triangle_indices_second] * dunavant_weight_reshaped, axis=(1, 2)) * areas[triangle_indices_second]
+
+# Compute the final E_contribution
+E_contribution = E_contribution_first - E_contribution_second
+
+# Reshape E_contribution to match the expected output shape (N, 1)
+E_contribution = E_contribution.reshape(-1, 1)
+print(1)
+
+def integrate_test(self, integrand, triangle_points, triangle_area):
+    l_edge = np.linalg.norm(triangle_points[0]-triangle_points[1]) #Length of common edge
+    scalar = lambda r: np.dot(l_edge/(2*triangle_area)*(r-triangle_points[2]),integrand(r)) #This function ensures that we only have to integrate over a scalar function as the test/basis function dotted with the vector field results in a scalar function.
+    Itest = self.integrate_known_triangle(scalar,triangle_area) #Integrate the new scalar function using the int_triangle function.
+    return Itest
+
+E= np.zeros([N,1],dtype=np.complex128)
+
+def Efield_(pos):
     return EF.E_in(input_EFIELD_AMPLITUDE, input_EFIELD_DIRECTION, pos, input_EFIELD_POLARIZATION, wavelength)
 
-#  Integrate the incident electric field over all test functions
+
 n = 0
-while n<N:
-    E[n] = simple.int_test(Efield_in,np.array([r_vect[n,0], r_vect[n,1], r_vect[n,2]])) - simple.int_test(Efield_in,np.array([r_vect[n,0], r_vect[n,1], r_vect[n,3]])) #integral E(r)*t(r) dr over surface triangle
-    n=n+1
+for n in range (0,N):
+    E[n] = integrate_test(E_field_, np.array(vertices[rwgs[n,0:3]])) - integrate_test(E_field_, np.array([vertices[rwgs[n,0]], vertices[rwgs[n,1]], vertices[rwgs[n,3]]]))
+
+print(1)
 
 # Plot the incident electric field over the inner edges
 mesh.plot_current(E,e_vertex,input_EFIELD_DIRECTION,input_EFIELD_POLARIZATION)
 
-# Create system Matrix
-A = (N,N)
-A = np.zeros(A,dtype=np.complex128)
+approach=0
 
-n=0
-i=0
-
-timer_1_start_time=dt.now()
-timed_3 = False
-timed_4 = False
-
-while n<N:  # Loop through all basis functions
-    while i<N:  # Loop through all test functions
-        if i == n or i > n:  # This is an approximation but saves a lot of computation time (see comment below)*
-            # First check for singularity to decide which integrator to use and than integrate each triangle of each RWG over each other
-            if EF.check_sing(r_vect[n, 0], r_vect[n, 1], r_vect[n, 2], r_vect[i, 0], r_vect[i, 1], r_vect[i, 2]):
-                if not timed_3:
-                    timer_3_start_time=dt.now()
-                A[n,i] = A[n,i]+ 4*np.pi*duffy.int_bastest(np.array([r_vect[n,0], r_vect[n,1], r_vect[n,2]]), np.array([r_vect[i,0], r_vect[i,1], r_vect[i,2]]))
-                if not timed_3:
-                    timer_3_end_time=dt.now()
-                    print("Timer 3 - Main.py duffy: ",str(timer_3_end_time-timer_3_start_time))
-                    timed_3=True
-            else:
-                if not timed_4:
-                    timer_4_start_time=dt.now()
-                A[n, i] = A[n, i] + 4*np.pi*dunavant.int_bastest(np.array([r_vect[n, 0], r_vect[n, 1], r_vect[n, 2]]), np.array([r_vect[i, 0], r_vect[i, 1], r_vect[i, 2]]))
-                if not timed_4:
-                    timer_4_end_time=dt.now()
-                    print("Timer 4 - Main.py duffy: ",str(timer_4_end_time-timer_4_start_time))
-                    timed_4=True
-            if EF.check_sing(r_vect[n,0], r_vect[n,1], r_vect[n,2], r_vect[i,0], r_vect[i,1], r_vect[i,3]):
-                A[n,i] = A[n,i] - 4*np.pi*duffy.int_bastest(np.array([r_vect[n,0], r_vect[n,1], r_vect[n,2]]), np.array([r_vect[i,0], r_vect[i,1], r_vect[i,3]]))
-            else:
-                A[n,i] = A[n,i] - 4*np.pi*dunavant.int_bastest(np.array([r_vect[n,0], r_vect[n,1], r_vect[n,2]]), np.array([r_vect[i,0], r_vect[i,1], r_vect[i,3]]))
-            if EF.check_sing(r_vect[n,0], r_vect[n,1], r_vect[n,3], r_vect[i,0], r_vect[i,1], r_vect[i,2]):
-                A[n,i] = A[n,i] - 4*np.pi*duffy.int_bastest(np.array([r_vect[n, 0], r_vect[n, 1], r_vect[n, 3]]), np.array([r_vect[i, 0], r_vect[i, 1], r_vect[i, 2]]))
-            else:
-                A[n, i] = A[n, i] - 4*np.pi*dunavant.int_bastest(np.array([r_vect[n, 0], r_vect[n, 1], r_vect[n, 3]]), np.array([r_vect[i, 0], r_vect[i, 1], r_vect[i, 2]]))
-            if EF.check_sing(r_vect[n,0], r_vect[n,1], r_vect[n,3], r_vect[i,0], r_vect[i,1], r_vect[i,3]):
-                A[n, i] = A[n, i] + 4*np.pi*duffy.int_bastest(np.array([r_vect[n, 0], r_vect[n, 1], r_vect[n, 3]]), np.array([r_vect[i, 0], r_vect[i, 1], r_vect[i, 3]]))
-            else:
-                A[n, i] = A[n, i] + 4*np.pi*dunavant.int_bastest(np.array([r_vect[n, 0], r_vect[n, 1], r_vect[n, 3]]), np.array([r_vect[i, 0], r_vect[i, 1], r_vect[i, 3]]))
-        i=i+1
-    n=n+1
+if approach==0:
+    # Create system Matrix
+    A = np.zeros((N,N),dtype=np.complex128)
+    n=0
     i=0
-
-timer_1_end_time=dt.now()
-print("Timer 1 - Main.py whileloop basis functions (Full): ",str(timer_1_end_time-timer_1_start_time))
+    while n<N:  # Loop through all basis functions
+        while i<N:  # Loop through all test functions
+            if i == n or i > n:  # This is an approximation but saves a lot of computation time (see comment below)*
+                # First check for singularity to decide which integrator to use and than integrate each triangle of each RWG over each other
+                if EF.check_sing(r_vect[n, 0], r_vect[n, 1], r_vect[n, 2], r_vect[i, 0], r_vect[i, 1], r_vect[i, 2]):
+                    A[n,i] = A[n,i]+ 4*np.pi*duffy.int_bastest(np.array([r_vect[n,0], r_vect[n,1], r_vect[n,2]]), np.array([r_vect[i,0], r_vect[i,1], r_vect[i,2]]))
+                else:
+                    A[n, i] = A[n, i] + 4*np.pi*dunavant.int_bastest(np.array([r_vect[n, 0], r_vect[n, 1], r_vect[n, 2]]), np.array([r_vect[i, 0], r_vect[i, 1], r_vect[i, 2]]))
+                if EF.check_sing(r_vect[n,0], r_vect[n,1], r_vect[n,2], r_vect[i,0], r_vect[i,1], r_vect[i,3]):
+                    A[n,i] = A[n,i] - 4*np.pi*duffy.int_bastest(np.array([r_vect[n,0], r_vect[n,1], r_vect[n,2]]), np.array([r_vect[i,0], r_vect[i,1], r_vect[i,3]]))
+                else:
+                    A[n,i] = A[n,i] - 4*np.pi*dunavant.int_bastest(np.array([r_vect[n,0], r_vect[n,1], r_vect[n,2]]), np.array([r_vect[i,0], r_vect[i,1], r_vect[i,3]]))
+                if EF.check_sing(r_vect[n,0], r_vect[n,1], r_vect[n,3], r_vect[i,0], r_vect[i,1], r_vect[i,2]):
+                    A[n,i] = A[n,i] - 4*np.pi*duffy.int_bastest(np.array([r_vect[n, 0], r_vect[n, 1], r_vect[n, 3]]), np.array([r_vect[i, 0], r_vect[i, 1], r_vect[i, 2]]))
+                else:
+                    A[n, i] = A[n, i] - 4*np.pi*dunavant.int_bastest(np.array([r_vect[n, 0], r_vect[n, 1], r_vect[n, 3]]), np.array([r_vect[i, 0], r_vect[i, 1], r_vect[i, 2]]))
+                if EF.check_sing(r_vect[n,0], r_vect[n,1], r_vect[n,3], r_vect[i,0], r_vect[i,1], r_vect[i,3]):
+                    A[n, i] = A[n, i] + 4*np.pi*duffy.int_bastest(np.array([r_vect[n, 0], r_vect[n, 1], r_vect[n, 3]]), np.array([r_vect[i, 0], r_vect[i, 1], r_vect[i, 3]]))
+                else:
+                    A[n, i] = A[n, i] + 4*np.pi*dunavant.int_bastest(np.array([r_vect[n, 0], r_vect[n, 1], r_vect[n, 3]]), np.array([r_vect[i, 0], r_vect[i, 1], r_vect[i, 3]]))
+            i=i+1
+        n=n+1
+        i=0
+else:
+    A = np.zeros((N,N),dtype=np.complex128)
+    is_singular = np.zeros((N,N),dtype=bool)
+    for n in range(N):
+        for i in range(n, N):
+            is_singular[n,i] = EF.check_sing_vectorized(r_vect[n, 0:3], r_vect[i, 0:3])
+    for n in range(N):
+        for i in range(n, N):
+            if is_singular[n, i]:
+                A[n, i] += 4 * np.pi * duffy.int_bastest_vectorized(r_vect[n, 0:3], r_vect[i, 0:3])
+            else:
+                A[n, i] += 4 * np.pi * dunavant.int_bastest_vectorized(r_vect[n, 0:3], r_vect[i, 0:3])
+            A[i, n] = A[n, i]  # Mirror result to leverage symmetry
 
 A = A+np.transpose(A)-np.diag(np.diag(A)) #this is an approximation but saves a lot of computation time (see comment below)*
 
@@ -156,6 +168,3 @@ EF.plot_theta(input_FARFIELD_DIRECTION[1],E_farfield)
 del dunavant
 del duffy
 del simple
-
-end_time=time.perf_counter()
-print("time:",end_time-start_time)
