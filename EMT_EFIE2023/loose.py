@@ -94,3 +94,33 @@ def calculate_triangle_area(vertices):
     c = np.linalg.norm(vertices[2] - vertices[0])
     s = (a + b + c) / 2
     return np.sqrt(s * (s - a) * (s - b) * (s - c))
+
+def check_triangle_pair_singularity(rwgs):
+    N = rwgs.shape[0]
+    # Initialize an array to hold singularity results for each triangle pair
+    # Shape (N, N, 4) where the last dimension holds boolean flags for each triangle pair comparison
+    singularities = np.ones((N, N, 4), dtype=bool)
+    
+    # Generate all triangle vertex indices from rwgs
+    # Triangle 1 indices: common edge + non-common vertex of the first triangle
+    # Triangle 2 indices: common edge + non-common vertex of the second triangle
+    triangle_indices = np.zeros((N, 2, 3), dtype=int)
+    triangle_indices[:, 0, :2] = rwgs[:, :2]  # Common edge for the first triangle
+    triangle_indices[:, 1, :2] = rwgs[:, :2]  # Common edge for the second triangle
+    triangle_indices[:, 0, 2] = rwgs[:, 2]  # Non-common vertex for the first triangle
+    triangle_indices[:, 1, 2] = rwgs[:, 3]  # Non-common vertex for the second triangle
+    
+    # Check for shared vertices between each pair of triangles in rwgs
+    for n in range(N):
+        for i in range(N):
+            if i!=n:
+                for t1 in range(2):
+                    for t2 in range(2):
+                        # Extract vertex indices for the triangles being compared
+                        vertices_n = triangle_indices[n, t1]
+                        vertices_i = triangle_indices[i, t2]
+                        # Check if there's any shared vertex
+                        shared_vertex = np.intersect1d(vertices_n, vertices_i).size > 0
+                        singularities[n, i, 2*t1 + t2] = shared_vertex
+    
+    return singularities

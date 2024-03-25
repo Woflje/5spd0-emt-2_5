@@ -2,7 +2,6 @@ import numpy as np
 
 import Integrator_bastest as EJHM
 import integrator_bastest_Duffy as EJHM_Duffy
-import Basic_Integrator as simple_int
 import EFIE_functions as EF
 from Mesh import Mesh
 
@@ -16,7 +15,7 @@ from parameters import parameters
 from E_field import E_field_essentials
 from integrators.dunavant.Dunavant import get_Dunavant_values
 
-from loose import restructure_mesh_rwg_data
+from loose import restructure_mesh_rwg_data, check_triangle_pair_singularity
 
 from Integration import int_test
 
@@ -66,13 +65,10 @@ mesh.plot_current(E,e_vertex,parameters["E_field_in"]["direction"],parameters["E
 # Create system Matrix
 A = (N,N)
 A = np.zeros(A,dtype=np.complex128)
-
-n=0
-i=0
-
-while n<N:  # Loop through all basis functions
-    while i<N:  # Loop through all test functions
-        if i == n or i > n:  # This is an approximation but saves a lot of computation time (see comment below)*
+approach = 1
+if approach == 0:
+    for n in range(N):
+        for i in range(n,N):
             for t1 in range(2,4):
                 for t2 in range(2,4):
                     factor = -1 if t1 != t2 else 1
@@ -87,9 +83,26 @@ while n<N:  # Loop through all basis functions
                             dunavant_positions[rwgs[n,t1+2]],
                             dunavant_positions[rwgs[i,t2+2]]
                             )
-        i=i+1
-    n=n+1
-    i=0
+else:
+    print(f"checking {N} rwgs for singularities")
+    singularities_map = check_triangle_pair_singularity(rwgs)
+    print("Starting the big loop")
+    for n in range(N):
+        for i in range(n,N):
+            for t1 in range(2,4):
+                for t2 in range(2,4):
+                    factor = 1 if t1 == t2 else -1
+                    if singularities_map[n,i,2*t1+t2-6]:
+                        A[n,i] = A[n,i]+factor*4*np.pi*duffy.int_bastest(vertices[rwgs[n,[0,1,t1]]],vertices[rwgs[i,[0,1,t2]]])
+                    else:
+                        A[n,i] = A[n,i]+factor*4*np.pi*dunavant.int_bastest(
+                            vertices[rwgs[n,[0,1,t1]]],
+                            vertices[rwgs[i,[0,1,t2]]],
+                            areas[rwgs[n,t1+2]],
+                            areas[rwgs[i,t2+2]],
+                            dunavant_positions[rwgs[n,t1+2]],
+                            dunavant_positions[rwgs[i,t2+2]]
+                            )
 
 A = A+np.transpose(A)-np.diag(np.diag(A)) #this is an approximation but saves a lot of computation time (see comment below)*
 
