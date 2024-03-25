@@ -285,157 +285,6 @@ class Mesh:
     def __str__(self):
         return "Mesh structure containing " + str(len(self.objects)) + " objects."
 
-    # plotting function, use boolean true to include normal vectors of the triangles
-    def plot(self, normals=False):
-        x_axis = []
-        y_axis = []
-        z_axis = []
-
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        for i in range(len(self.objects)):
-            # Set up parameters
-            x = []
-            y = []
-            z = []
-            X = []
-            Y = []
-            z_2D = []
-
-            # Set up parameters for normal
-            if normals:
-                mean_x = []
-                mean_y = []
-                mean_z = []
-                norm = []
-
-            n_triangles = len(self.objects[i].triangles)
-            edge_length = np.sqrt(
-                np.sum(np.square(self.objects[i].edges[0].vertex1 - self.objects[i].edges[0].vertex2)))
-
-            # Create 1D arrays for x, y and z coordinates
-            for l in range(n_triangles):
-                vertices = self.objects[i].triangles[l].points
-                for k in range(3):
-                    x = np.append(x, vertices[k][0])
-                    y = np.append(y, vertices[k][1])
-                    z = np.append(z, vertices[k][2])
-                # find mean value of each triangle
-                if normals:
-                    norm = np.append(norm, self.objects[i].triangles[l].normal)
-                    mean_x = np.append(mean_x, np.mean(x[3 * l:3 * l + 3]))
-                    mean_y = np.append(mean_y, np.mean(y[3 * l:3 * l + 3]))
-                    mean_z = np.append(mean_z, np.mean(z[3 * l:3 * l + 3]))
-
-            # When normal vector is perpendicular to z-axis, data (coordinates) must be converted for new plotting
-            # function input is triangle n, output is X, Y, Z vectors to make surface plot
-            def normal_z(n):
-                x_local = x[3 * n:3 * n + 3]
-                y_local = y[3 * n:3 * n + 3]
-                z_local = z[3 * n:3 * n + 3]
-                # If triangle is in yz plane, sort over y-coordinate, else over x-coordinate
-                if x_local[0] == x_local[1] and x_local[0] == x_local[2] and x_local[1] == x_local[2]:
-                    # find arguments for minimum, maximum and middle value of y
-                    ind_min = np.argmin(y[3 * n:3 * n + 3])
-                    ind_max = np.argmax(y[3 * n:3 * n + 3])
-                    ind = ind_min, ind_max
-                    test = 0, 1, 2
-                    ind_mid = list(set(test) - set(ind))
-                    # Sort from low to high, and make it a loop by appending first value to end
-                    y_local = np.sort(y_local)
-                    y_local = np.append(y_local, y_local[0])
-                    # sort corresponding x-coordinates
-                    x_local = np.array([x_local[ind_min], x_local[ind_mid[0]], x_local[ind_max], x_local[ind_min]])
-                    # sort corresponding z-coordinates: first row is one of the bounds, second row is other bound
-                    z_2D = np.zeros([2, 4])
-                    z_2D[0] = z_local[ind_min], z_local[ind_mid[0]], z_local[ind_max], z_local[ind_min]
-                    z_2D[1] = z_2D[0]
-                    if z_2D[0, 2] - z_2D[0, 0] == 0:
-                        z_2D[1, 1] = z_2D[0, 0]
-                    else:
-                        slope = (y_local[2] - y_local[0]) / (z_2D[0, 2] - z_2D[0, 0])
-                        interc = y_local[2] - slope * z_2D[1, 2]
-                        z_2D[1, 1] = slope * y_local[1] + interc
-                else:
-                    # find arguments for minimum, maximum and middle value of x
-                    ind_min = np.argmin(x[3 * n:3 * n + 3])
-                    ind_max = np.argmax(x[3 * n:3 * n + 3])
-                    ind = ind_min, ind_max
-                    test = 0, 1, 2
-                    ind_mid = list(set(test) - set(ind))
-                    # Sort from low to high, and make it a loop by appending first value to end
-                    x_local = np.sort(x_local)
-                    x_local = np.append(x_local, x_local[0])
-                    # sort corresponding y-coordinates
-                    y_local = np.array([y_local[ind_min], y_local[ind_mid[0]], y_local[ind_max], y_local[ind_min]])
-                    # sort corresponding z-coordinates: first row is one of the bounds, second row is other bound
-                    z_2D = np.zeros([2, 4])
-                    z_2D[0] = z_local[ind_min], z_local[ind_mid[0]], z_local[ind_max], z_local[ind_min]
-                    z_2D[1] = z_2D[0]
-                    if z_2D[0, 2] - z_2D[0, 0] == 0:
-                        z_2D[1, 1] = z_2D[0, 0]
-                    else:
-                        z_2D[1, 1] = (x_local[2] - x_local[0]) / (z_2D[0, 2] - z_2D[0, 0]) * x_local[1]
-                        slope = (x_local[2] - x_local[0]) / (z_2D[0, 2] - z_2D[0, 0])
-                        interc = x_local[2] - slope * z_2D[1, 2]
-                        z_2D[1, 1] = slope * x_local[1] + interc
-                return x_local, y_local, z_2D
-
-            # Surface plot with triangle grid shown. Triangles are plotted over every three points in the x, y, z arrays
-            for n in range(n_triangles):
-                # checks if normal is perpendicular to z-axis.
-                # In this case a different plotting function is used due to limitations on the plot_trisurf function
-                if self.objects[i].triangles[n].normal[2] == 0:
-                    X, Y, z_2D = normal_z(n)
-                    ax.plot_surface(X, Y, z_2D, linewidth=0.2, edgecolor='black', color='blue', shade=False)
-                else:
-                    ax.plot_trisurf(x[3 * n:3 * n + 3], y[3 * n:3 * n + 3], z[3 * n:3 * n + 3], linewidth=0.2,
-                                    color='blue', edgecolor='black', shade=True)
-                if normals:
-                    ax.quiver(mean_x[n], mean_y[n], mean_z[n], norm[3 * n], norm[3 * n + 1], norm[3 * n + 2],
-                              length=(edge_length * 0.5), color='red')
-
-            # define axes limits
-            if i == 0:
-                x_axis = [max(x), min(x)]
-                y_axis = [max(y), min(y)]
-                z_axis = [max(z), min(z)]
-            else:
-                if max(x) > x_axis[0]:
-                    x_axis[0] = max(x)
-                if min(x) < x_axis[1]:
-                    x_axis[1] = min(x)
-                if max(y) > y_axis[0]:
-                    y_axis[0] = max(y)
-                if min(x) < y_axis[1]:
-                    y_axis[1] = min(y)
-                if max(z) > z_axis[0]:
-                    z_axis[0] = max(z)
-                if min(x) < z_axis[1]:
-                    z_axis[1] = min(x)
-            boundarylim = edge_length * 0.1
-
-        # Combine the coordinates to desired form to do calculations with from line 436 onwards
-        array1 = np.vstack((x, y, z))
-        array1_transpose = array1.transpose()
-        self.array1_reshape = np.reshape(array1_transpose, (-1, 9))  # Goes in def getmatrix(self) (line 436)
-
-        # scale axes
-        max_range = max(np.array([x_axis[0] - x_axis[1], y_axis[0] - y_axis[1], z_axis[0] - z_axis[1]])) / 2
-        mid_x = (x_axis[0] + x_axis[1]) * 0.5
-        mid_y = (y_axis[0] + y_axis[1]) * 0.5
-        mid_z = (z_axis[0] + z_axis[1]) * 0.5
-        ax.set_xlim(mid_x - max_range - boundarylim, mid_x + max_range + boundarylim)
-        ax.set_ylim(mid_y - max_range - boundarylim, mid_y + max_range + boundarylim)
-        ax.set_zlim(mid_z - max_range - boundarylim, mid_z + max_range + boundarylim)
-        self.plot_limits = [mid_x - max_range - boundarylim,mid_x + max_range + boundarylim,mid_y - max_range - boundarylim,mid_y + max_range + boundarylim,mid_z - max_range - boundarylim,mid_z + max_range + boundarylim]
-
-        ax.set_xlabel('X axis')
-        ax.set_ylabel('Y axis')
-        ax.set_zlabel('Z axis')
-        plt.show()
-
-        return
     def prepare_plot_data(self, normals=False):
         # Initialize lists to accumulate all coordinates for determining plot limits
         all_x, all_y, all_z = [], [], []
@@ -507,6 +356,7 @@ class Mesh:
         ax.set_ylabel('Y axis')
         ax.set_zlabel('Z axis')
         plt.show()
+        
     def getmatrix(self):
 
         # TRIANGLE AREAS
@@ -791,5 +641,3 @@ class Mesh:
 
         fig.colorbar(mapp, ax=ax, ticks=np.linspace(min(currents_on_edge[0]), max(currents_on_edge[0]), 20))
         plt.show()
-
-        return
