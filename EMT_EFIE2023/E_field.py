@@ -24,12 +24,20 @@ def E_field_essentials(k, direction, polarization_angle):
     pol_vect1 = Vect1 / np.linalg.norm(Vect1)
     pol_vect2 = Vect2 / np.linalg.norm(Vect2)
 
-    polarization_angle = np.pi/4
     final_polarization = np.sin(polarization_angle)*pol_vect2 + np.cos(polarization_angle)*pol_vect1
     final_polarization = final_polarization / np.linalg.norm(final_polarization)
     return k_vector, final_polarization
 
-def E_field_in_point(pos, k_vector, polarization, amp):
-    phase_shift = np.exp(-1j*np.dot(k_vector,pos))
+def E_field_in_pointss(positions, k_vector, polarization, amp):
+    phase_shift = np.exp(-1j * np.dot(k_vector, positions.T))  # Adjusted for vectorized dot product
     E_field = amp * polarization * phase_shift
     return E_field
+
+def E_field_in_points(positions, k_vector, polarization, amp):
+    # Ensure k_vector is reshaped for correct broadcasting when pos is 2D
+    phase_shift = np.exp(-1j * np.einsum('i,npi->np', k_vector, positions))
+    E_field = amp * polarization * phase_shift[:, :, np.newaxis]
+    return E_field
+
+def E_field_in_position(position, k_vector, polarization, amp):
+    return amp * polarization * np.exp(-1j * np.dot(k_vector, position))
