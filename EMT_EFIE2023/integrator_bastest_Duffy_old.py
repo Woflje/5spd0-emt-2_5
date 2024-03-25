@@ -1,20 +1,22 @@
 import numpy as np
+import scipy
+import math
+import Basic_Integrator_old as Basic_Integrator
 import FastNP as fnp
-from loose import calculate_triangle_area
-from Integration import int_triangle
+
 
 class integrator_bastest():
-    def __init__(self,dunavant_integrator,k,order_duffy,order_dunavant,dunavant_values,dunavant_weight):
+    def __init__(self,k,order_duffy,order_dunavant):
         print("Initialize integration Duffy method")
-        self.dunavant_integrator = dunavant_integrator
         self.k = k # wave vector
         self.order_duffy = order_duffy #oder of the duffy method
         self.order_dunavant = order_dunavant #order of the dunvant method
-        self.dunavant_values = dunavant_values
-        self.dunavant_weight = dunavant_weight
         
         #Function that computes the integral over one subdomain. If called three times the whole triangle is integrated using duffy
     def EvaluateSubtriangle(self,r0,r1,r2,z,n,Func):
+        
+        
+        
         #lengths of all three sides of subdomain.
         l1 = np.subtract(r2,r1)
         l2 = np.subtract(r0,r2)
@@ -36,14 +38,18 @@ class integrator_bastest():
         
         Ap = np.dot(n_hat,cross1)/2 #area of subdomain
         h1 = np.multiply(2*Ap/(fnp.fastNorm(l1)**2),fnp.fastCross(l1,n_hat)) #height of subdomain. This will be along the y in our new coordinate system.  
-
+        
+        
+        
         Gauss = np.polynomial.legendre.leggauss(self.order_duffy) #obtain weights and values for our gauss legendre polynomial of the given order
         #As we want gauss legendre from the intrval [0,1] instead of [-1,1] we need to transform the coordinates
         weight_new = np.multiply(0.5,Gauss[1]) 
         zeta_new = np.multiply(0.5,np.add(Gauss[0],1))
         length = len(zeta_new) #length of gaussian quadrature
         
+        
         h1_hat = h1/fnp.fastNorm(h1) #direction of the heigth, this is the y_prime direction in our new coordinate system
+        
         
         #upper and lower x values for the domain. As this has to of course be in our T2 triangle
         x_low = np.multiply(np.dot(n_hat,fnp.fastCross(h1_hat,l2)),np.subtract(1,zeta_new))
@@ -76,6 +82,9 @@ class integrator_bastest():
     
     #Function that calculates the integral over T2 with Duffy and Integral T1 with Dunavant. Every Dunavant point is an observation point for the dunavant method on T2.
     def int_bastest(self,T1,T2):
+        
+        Integrate = Basic_Integrator.Basic_Integrator(self.order_dunavant) #define integrator
+        
         l1 = np.subtract(T2[1],T2[0])   #length of side 1 from vertex 2 to 3
         l2 = np.subtract(T2[2],T2[1])   #length of side 2 from vertex 1 to 2
         cross1=fnp.fastCross(l1,l2)
@@ -83,14 +92,15 @@ class integrator_bastest():
         num_j = np.complex128(0+1j) #imaginairy unit
         
         length1 = fnp.fastNorm(np.subtract(T1[1],T1[0])) #length of common edge RWG
-        length2 = fnp.fastNorm(np.subtract(T2[1],T2[0])) #length of common edge RWG\
-        A1 = calculate_triangle_area(T1) #area of triangle 1
-        A2 = calculate_triangle_area(T2) #area of triangle 2
+        length2 = fnp.fastNorm(np.subtract(T2[1],T2[0])) #length of common edge RWG
+        A2 = Integrate.area_triangle(T2) #area of triangle 2
+        A = Integrate.area_triangle(T1) #area of triangle 1
+        
         
         basis = lambda r,rp: length2/(2*A2)*(np.subtract(rp,T2[2])) #define basis function
-        Test = lambda r,rp: length1/(2*A1)*(np.subtract(r,T1[2])) #define test function
+        Test = lambda r,rp: length1/(2*A)*(np.subtract(r,T1[2])) #define test function
         
-        Div_basis_test = lambda r,rp: 1/(num_j*self.k)*length2/A2*length1/A1 #Divergence of test function, scalar so no need to make it a function
+        Div_basis_test = lambda r,rp: 1/(num_j*self.k)*length2/A2*length1/A #Divergence of test function, scalar so no need to make it a function
         basis_test = lambda r,rp: num_j*self.k*np.dot(basis(r,rp),Test(r,rp)) #function for the dot product of the tes and basis function. Easy way of implementing when providing both in first triangle, r will not matter as second triangle is only dependend on rp.
         
 
@@ -102,17 +112,13 @@ class integrator_bastest():
         
         #Function to integrate the first integral this is the hypersingular equation where the divergences are taken into account. Therefroe the function given is 1 as the divergence is multiplied later as this is a constant.
         #The summation is implemented three times to calculate all the three domains of triangle 2 using duffy.
-
-        dunavant_positions_T1=np.dot(self.dunavant_values,T1)
-
-        Int_triangle1 = lambda r: self.EvaluateSubtriangle(proj(r),T2[1],T2[2],z(r),n,lambda rp: Div_basis_test(r,rp)) + self.EvaluateSubtriangle(proj(r),T2[2],T2[0],z(r),n,lambda rp: Div_basis_test(r,rp)) + self.EvaluateSubtriangle(proj(r),T2[0],T2[1],z(r),n,lambda rp: Div_basis_test(r,rp))
-        I_HS = int_triangle(Int_triangle1,A1,dunavant_positions_T1,self.dunavant_weight)
+        Int_triangle = lambda r: self.EvaluateSubtriangle(proj(r),T2[1],T2[2],z(r),n,lambda rp: Div_basis_test(r,rp)) + self.EvaluateSubtriangle(proj(r),T2[2],T2[0],z(r),n,lambda rp: Div_basis_test(r,rp)) + self.EvaluateSubtriangle(proj(r),T2[0],T2[1],z(r),n,lambda rp: Div_basis_test(r,rp))
+        I_HS = Integrate.int_triangle(Int_triangle,T1)
         
         
         #Function to integrate the second integral the Singular integral, here the basis and test function are given. This needs to be done three times for all the three triangular domains for duffy.
         Int_triangle2 = lambda r: self.EvaluateSubtriangle(proj(r),T2[1],T2[2],z(r),n,lambda rp: basis_test(r,rp)) + self.EvaluateSubtriangle(proj(r),T2[2],T2[0],z(r),n,lambda rp: basis_test(r,rp)) + self.EvaluateSubtriangle(proj(r),T2[0],T2[1],z(r),n,lambda rp: basis_test(r,rp))
-        I_S = int_triangle(Int_triangle2,A1,dunavant_positions_T1,self.dunavant_weight)
+        I_S = Integrate.int_triangle(Int_triangle2,T1)
             
         
         return I_HS+I_S
-
