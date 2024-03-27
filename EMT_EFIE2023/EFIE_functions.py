@@ -2,69 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import FastNP as fnp
 
-def E_in_vectorized2(amp, dir, pos, polarization, k):
-    # Convert spherical to cartesian coordinates for the wave direction
-    kx = k * np.sin(dir[0]) * np.cos(dir[1])
-    ky = k * np.sin(dir[0]) * np.sin(dir[1])
-    kz = k * np.cos(dir[0])
-    k_vec = np.array([kx, ky, kz])
-
-    # Calculate electric field vector
-    # Assuming polarization affects the amplitude direction, simplified here
-    E0 = amp * np.array([np.cos(polarization), np.sin(polarization), 0])  # Simplified polarization
-    
-    # Calculate phase shift for each position
-    phase_shift = np.exp(-1j * np.dot(pos, k_vec))
-
-    # Apply amplitude and polarization
-    E_field = E0[:, np.newaxis] * phase_shift
-    
-    return E_field
-
-def E_in_vectorized(amp, dir, pos, polarization, wavelength):
-    # Determine wavenumber
-    k = 2*np.pi / wavelength
-
-    #Determine wave vector using input angles phi (dir[0]) and theta (dir[1])
-    kx = k*np.sin(dir[0])*np.cos(dir[1])
-    ky = k*np.sin(dir[0])*np.sin(dir[1])
-    kz = k*np.cos(dir[0])
-    wave_vector = np.array([kx, ky, kz])
-
-    #Find values for a vector with a slightly different phi value
-    kx_phi = k*np.sin(dir[0]+0.001)*np.cos(dir[1])
-    ky_phi = k*np.sin(dir[0]+0.001)*np.sin(dir[1])
-    kz_phi = k*np.cos(dir[0]+0.001)
-    phi_vect = np.array([kx_phi, ky_phi, kz_phi])
-
-    #Find values for a vector with a slightly different theta value
-    kx_th = k*np.sin(dir[0])*np.cos(dir[1]+0.004)
-    ky_th = k*np.sin(dir[0])*np.sin(dir[1]+0.004)
-    kz_th = k*np.cos(dir[0])
-    theta_vect = np.array([kx_th, ky_th, kz_th])
-
-    # Cross product of the wave vector and the changed phi and theta vectors to find perpendicular vectors
-    Vect1 = fnp.fastCross(phi_vect, wave_vector)
-    Vect2 = fnp.fastCross(theta_vect, wave_vector)
-
-    # Normalize the perpendicular vectors
-    pol_vect1 = Vect1 / fnp.fastNorm(Vect1)
-    pol_vect2 = Vect2 / fnp.fastNorm(Vect2)
-
-    # Allow user to choose polarization by using input angle between the two normalized polarization vectors
-    polarization_vect = np.sin(polarization) * pol_vect2 + np.cos(polarization) * pol_vect1
-    polarization_vect = polarization_vect / fnp.fastNorm(polarization_vect)
-
-    # Dot product to check if polarization is perpendicular to the wave vector
-    if np.dot(wave_vector, polarization_vect) > 1e-10:
-        print("The polarization and wavenumber are not perpendicular!")
-
-    # Calculate the E-field for each position
-    phase_shift = np.exp(-1j * np.dot(wave_vector, pos.T))  # Dot product and phase shift for each position
-    E_field = amp * polarization_vect[:, np.newaxis] * phase_shift  # Apply amplitude and polarization
-
-    return E_field.T  # Return transpose to match the expected shape (N, 3)
-
 def E_in(amp, dir, pos, polarization, wavelength): # Function to calculate the incoming electric field
     #Determine wavenumber
     k = 2 * np.pi / (wavelength)
