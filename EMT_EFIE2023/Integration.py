@@ -5,6 +5,13 @@ def int_triangle(integrand,A,dunavant_pos,dunavant_weight):
     phi_t=np.array([integrand(r) for r in dunavant_pos])
     return A*sum(np.multiply(phi_t[:,np.newaxis],dunavant_weight[:,np.newaxis]))[0]
 
+def int_triangle_duffy(integrand,A,pos,dunavant_weight):
+    phi_t=integrand(pos)
+    return A*sum(np.multiply(phi_t[:,np.newaxis],dunavant_weight[:,np.newaxis]))[0]
+
+def int_triangle_duffy_scalar(phi_t,A,dunavant_weight):
+    return A*sum(np.multiply(phi_t[:,np.newaxis],dunavant_weight[:,np.newaxis]))[0]
+
     #Function that calculates the integral over a triangle for a vector field
 def int_test(integrand,triangle_points,A,dunavant_pos,dunavant_weight):
     l_edge = fastNorm(np.subtract(triangle_points[0],triangle_points[1])) #Length of common edge
