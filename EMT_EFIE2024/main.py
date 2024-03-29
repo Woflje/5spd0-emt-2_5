@@ -5,7 +5,7 @@ from integrators.integrator_base_test_duffy import Integrator_base_test_duffy
 from integrators.dunavant.dunavant import get_dunavant_values
 from integrators.integration import int_test
 from plot import plot_phi, plot_theta
-from Mesh import Mesh, check_triangle_pair_singularity, restructure_mesh_rwg_data
+from mesh.Mesh import Mesh, check_triangle_pair_singularity, restructure_mesh_rwg_data
 from E_field import E_field_in_position, E_field_essentials
 from Timer import Timer
 
@@ -46,14 +46,13 @@ def Efield_in(pos):
 
 #  Integrate the incident electric field over all test functions
 
-n = 0
-while n<N:
+for n in range(N):
     E[n] = int_test(Efield_in,vertices[rwgs[n,0:3]],areas[rwgs[n,4]],dunavant_positions[rwgs[n,4]],dunavant_weight)\
           - int_test(Efield_in,vertices[rwgs[n,[0,1,3]]],areas[rwgs[n,5]],dunavant_positions[rwgs[n,5]],dunavant_weight) #integral E(r)*t(r) dr over surface triangle
-    n=n+1
 
 # Plot the incident electric field over the inner edges
-mesh.plot_current(E,e_vertex,parameters["E_field_in"]["direction"],parameters["E_field_in"]["polarization"])
+if parameters["plots"]:
+    mesh.plot_current(E,e_vertex,parameters["E_field_in"]["direction"],parameters["E_field_in"]["polarization"])
 
 # Create system Matrix
 A = (N,N)

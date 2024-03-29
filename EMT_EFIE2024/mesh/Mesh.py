@@ -1,6 +1,6 @@
-from Object import Object
-from Triangle import Triangle
-from Edge import Edge
+from mesh.Object import Object
+from mesh.Triangle import Triangle
+from mesh.Edge import Edge
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
