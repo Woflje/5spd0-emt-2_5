@@ -47,31 +47,30 @@ def calculate_triangle_area(vertices):
     return np.sqrt(s * (s - a) * (s - b) * (s - c))
 
 def check_triangle_pair_singularity(rwgs):
+    # Step 1: Expand rwgs to triangle vertices
+    # rwgs structure: [common_vertex_0, common_vertex_1, non_common_vertex_1st_triangle, non_common_vertex_2nd_triangle]
     N = rwgs.shape[0]
-    # Initialize an array to hold singularity results for each triangle pair
-    # Shape (N, N, 4) where the last dimension holds boolean flags for each triangle pair comparison
-    singularities = np.ones((N, N, 4), dtype=bool)
+    triangle_pairs = np.ones((N, N, 4, 3), dtype=int)  # Shape: (N, N, 4 pairs, 3 vertices per triangle)
     
-    # Generate all triangle vertex indices from rwgs
-    # Triangle 1 indices: common edge + non-common vertex of the first triangle
-    # Triangle 2 indices: common edge + non-common vertex of the second triangle
-    triangle_indices = np.zeros((N, 2, 3), dtype=int)
-    triangle_indices[:, 0, :2] = rwgs[:, :2]  # Common edge for the first triangle
-    triangle_indices[:, 1, :2] = rwgs[:, :2]  # Common edge for the second triangle
-    triangle_indices[:, 0, 2] = rwgs[:, 2]  # Non-common vertex for the first triangle
-    triangle_indices[:, 1, 2] = rwgs[:, 3]  # Non-common vertex for the second triangle
-    
-    # Check for shared vertices between each pair of triangles in rwgs
+    # Extract vertices indices for each triangle in every RWG pair
     for n in range(N):
         for i in range(n,N):
-            if i!=n:
-                for t1 in range(2):
-                    for t2 in range(2):
-                        # Extract vertex indices for the triangles being compared
-                        vertices_n = triangle_indices[n, t1]
-                        vertices_i = triangle_indices[i, t2]
-                        # Check if there's any shared vertex
-                        shared_vertex = np.intersect1d(vertices_n, vertices_i).size > 0
-                        singularities[n, i, 2*t1 + t2] = shared_vertex
+            triangle_pairs[n, i, 0, :] = [rwgs[n, 0], rwgs[n, 1], rwgs[n, 2]]  # Triangle 1 of RWG n
+            triangle_pairs[n, i, 1, :] = [rwgs[n, 0], rwgs[n, 1], rwgs[n, 3]]  # Triangle 2 of RWG n
+            triangle_pairs[n, i, 2, :] = [rwgs[i, 0], rwgs[i, 1], rwgs[i, 2]]  # Triangle 1 of RWG i
+            triangle_pairs[n, i, 3, :] = [rwgs[i, 0], rwgs[i, 1], rwgs[i, 3]]  # Triangle 2 of RWG i
+
+    # Step 2: Vectorized Singularity Check
+    singularities_map = np.zeros((N, N, 4), dtype=bool)  # Shape: (N, N, 4 pairs)
     
-    return singularities
+    for t1 in range(2):
+        for t2 in range(2, 4):
+            t1_vertices = triangle_pairs[:, :, t1, :].reshape(N, N, 1, 3)
+            t2_vertices = triangle_pairs[:, :, t2, :].reshape(N, N, 3, 1)
+            # Check if any vertex is shared between t1 and t2 triangles of each RWG pair
+            singularities_map[:, :, 2*t1+t2-2] = np.any(np.any(t1_vertices == t2_vertices, axis=-1), axis=-1)
+
+    return singularities_map
+
+
+

@@ -65,56 +65,34 @@ while n<N:
 # Create system Matrix
 A = (N,N)
 A = np.zeros(A,dtype=np.complex128)
-approach = 1
-if approach == 0:
-    print(f"checking {N} rwgs for singularities")
-    singularities_map = check_triangle_pair_singularity(rwgs)
-    print("Starting the big loop")
-    for n in range(N):
-        for i in range(n,N):
-            for t1 in range(2,4):
-                for t2 in range(2,4):
-                    factor = 1 if t1 == t2 else -1
-                    if singularities_map[n,i,2*t1+t2-6]:
+
+print(f"checking {N} rwgs for singularities")
+singularities_map = check_triangle_pair_singularity(rwgs)
+
+print("Starting the big loop")
+for n in range(N):
+    for i in range(n,N):
+        for t1 in range(2,4):
+            for t2 in range(2,4):
+                factor = 1 if t1 == t2 else -1
+                if singularities_map[n,i,2*t1+t2-6]:
+                    with Timer('Duffy'):
                         A[n,i] = A[n,i]+factor*4*np.pi*duffy.int_bastest(
-                            vertices[rwgs[n,[0,1,t1]]],
-                            vertices[rwgs[i,[0,1,t2]]]
-                            )
-                    else:
-                        A[n,i] = A[n,i]+factor*4*np.pi*dunavant.int_bastest(
-                            vertices[rwgs[n,[0,1,t1]]],
-                            vertices[rwgs[i,[0,1,t2]]],
-                            areas[rwgs[n,t1+2]],
-                            areas[rwgs[i,t2+2]],
-                            dunavant_positions[rwgs[n,t1+2]],
-                            dunavant_positions[rwgs[i,t2+2]]
-                            )
-else:
-    print(f"checking {N} rwgs for singularities")
-    singularities_map = check_triangle_pair_singularity(rwgs)
-    print("Starting the big loop")
-    for n in range(N):
-        for i in range(n,N):
-            for t1 in range(2,4):
-                for t2 in range(2,4):
-                    factor = 1 if t1 == t2 else -1
-                    if singularities_map[n,i,2*t1+t2-6]:
-                        A[n,i] = A[n,i]+factor*4*np.pi*duffy.int_bastest_new(
                             vertices[rwgs[n,[0,1,t1]]],
                             vertices[rwgs[i,[0,1,t2]]],
                             areas[rwgs[n,t1+2]],
                             areas[rwgs[i,t2+2]],
                             dunavant_positions[rwgs[n,t1+2]]
                             )
-                    else:
-                        A[n,i] = A[n,i]+factor*4*np.pi*dunavant.int_bastest(
-                            vertices[rwgs[n,[0,1,t1]]],
-                            vertices[rwgs[i,[0,1,t2]]],
-                            areas[rwgs[n,t1+2]],
-                            areas[rwgs[i,t2+2]],
-                            dunavant_positions[rwgs[n,t1+2]],
-                            dunavant_positions[rwgs[i,t2+2]]
-                            )
+                else:
+                    A[n,i] = A[n,i]+factor*4*np.pi*dunavant.int_bastest(
+                        vertices[rwgs[n,[0,1,t1]]],
+                        vertices[rwgs[i,[0,1,t2]]],
+                        areas[rwgs[n,t1+2]],
+                        areas[rwgs[i,t2+2]],
+                        dunavant_positions[rwgs[n,t1+2]],
+                        dunavant_positions[rwgs[i,t2+2]]
+                        )
 
 A = A+np.transpose(A)-np.diag(np.diag(A)) #this is an approximation but saves a lot of computation time (see comment below)*
 
