@@ -9,6 +9,8 @@ from mesh.Mesh import Mesh, check_triangle_pair_singularity, restructure_mesh_rw
 from E_field import E_field_in_position, E_field_essentials
 from Timer import Timer
 
+from scipy.io import savemat
+
 from parameters import parameters
 
 # Initialize the constants
@@ -85,6 +87,9 @@ with Timer('Integration'):
                             dunavant_positions[rwgs[i,t2+2]]
                             )
 
+del dunavant
+del duffy
+
 A = A+np.transpose(A)-np.diag(np.diag(A)) #this is an approximation but saves a lot of computation time (see comment below)*
 
 # * Only the upper triangle of the system matrix is calculated and is than mirrored. This is an approximation and should be removed for more precision, however it saves a lot of computation time
@@ -93,7 +98,8 @@ A = A+np.transpose(A)-np.diag(np.diag(A)) #this is an approximation but saves a 
 J = np.dot(np.linalg.inv(A),E)
 
 # Plot the currents over the inner edges
-mesh.plot_current(J, e_vertex, parameters["E_field_in"]["direction"], parameters["E_field_in"]["polarization"])
+if parameters["plots"]:
+    mesh.plot_current(J, e_vertex, parameters["E_field_in"]["direction"], parameters["E_field_in"]["polarization"])
 #%%
 # Start of the post-processing
 with Timer('Farfield processing'):
@@ -119,9 +125,13 @@ with Timer('Farfield processing'):
                 E_farfield[0,a,b,c] = np.sum(E_ff)
 
 # Plot the farfield results for a constant phi and a constant theta (the input parameters will decide which one is plotted)
-plot_phi(parameters["E_farfield"]["direction"][0],E_farfield)
-plot_theta(parameters["E_farfield"]["direction"][1],E_farfield)
+if parameters["plots"]:
+    plot_phi(parameters["E_farfield"]["direction"][0],E_farfield)
+    plot_theta(parameters["E_farfield"]["direction"][1],E_farfield)
 
 # Finalization of the code and delete of all integrator instances
-del dunavant
-del duffy
+
+mymat = {
+    "E_farfield": E_farfield
+}
+savemat("farfield_matrix.mat",mymat)
