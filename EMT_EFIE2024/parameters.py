@@ -1,5 +1,6 @@
 import numpy as np
 parameters = {
+    "plots": False,
     "wavelength": 100,
     "input_mesh_path": "examples/sphere_z_offset.dat",
     "E_field_in": {
@@ -15,5 +16,5 @@ parameters = {
         "polarization": np.array([0])
     },
     "order_dunavant": 5,
-    "order_duffy": 5
+    "order_Gauss_duffy": 5
 }

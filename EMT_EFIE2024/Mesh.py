@@ -1,48 +1,89 @@
-########################################################################################
-#
-# This code is part of the Eindhoven ElectroMagnetics Solver
-#
-#   Function name: Mesher class
-#
-#   Description: Creates mesh object and parses the mesh file
-#
-#   Input: path to meshfile, (verbosity), (object properties)
-#
-#   Output: none
-#
-#   Documentation: see documentation
-#
-#   Author name(s): Sjoerd Aker, Leroy Driessen revised by Noortje Geijs, Lieke Geubels, Koen Kaalberg
-#
-#   Date: 8-3-2020 revised on 9-4-2022
-#
-# The above authors declare that the following code is free of plagiarism.
-#
-# Maintainer/Supervisor: Roeland J. Dilz (r.dilz@tue.nl)
-#
-# This code will be published under GPL v 3.0 https://www.gnu.org/licenses/gpl-3.0.en.html
-#
-#######################################################################################
-
-
 from Object import Object
 from Triangle import Triangle
 from Edge import Edge
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 import os
 import re
-from datetime import datetime
 
+def calculate_triangle_area(vertices):
+    a = np.linalg.norm(vertices[0] - vertices[1])
+    b = np.linalg.norm(vertices[1] - vertices[2])
+    c = np.linalg.norm(vertices[2] - vertices[0])
+    s = (a + b + c) / 2
+    return np.sqrt(s * (s - a) * (s - b) * (s - c))
+
+def restructure_mesh_rwg_data(r_vect, dunavant_values):
+    # Flatten r_vect to get all vertices and deduplicate to get unique vertices
+    all_vertices = r_vect.reshape(-1, 3)
+    unique_vertices, inverse_indices = np.unique(all_vertices, axis=0, return_inverse=True)
+    
+    # Map vertices in r_vect to unique vertices indices
+    mapped_indices = inverse_indices.reshape(r_vect.shape[0], r_vect.shape[1])
+
+    # Initialize structures
+    rwgs = np.zeros((len(r_vect), 6), dtype=int)  # Mapping indices
+    areas = []  # To store areas of each triangle
+    positions = []  # To store positions (P, 3) for each triangle
+
+    triangle_tracker = {}  # Tracks whether a triangle has been processed
+
+    for i, rwg in enumerate(mapped_indices):
+        rwgs[i, :4] = rwg[:4]  # Fill in rwgs for vertices
+        
+        for j in range(2, 4):  # Loop over the unique vertices for each triangle
+            triangle_key = tuple(sorted([rwg[0], rwg[1], rwg[j]]))  # Create a unique key for the triangle
+
+            if triangle_key not in triangle_tracker:
+                vertices = unique_vertices[list(triangle_key)]
+                area = calculate_triangle_area(vertices)
+                areas.append(area)
+                # Directly use the corresponding dunavant positions data, assuming it matches the processing order
+                positions.append(np.dot(dunavant_values, vertices))
+
+                # Track this triangle's index
+                triangle_tracker[triangle_key] = len(areas) - 1
+
+            # Fill in rwgs for area and positions indices
+            rwgs[i, 4 + (j - 2)] = triangle_tracker[triangle_key]  # Triangle index
+
+    areas = np.array(areas)
+    dunavant_positions = np.array(positions)  # Convert to a structured NumPy array
+
+    return unique_vertices, rwgs, areas, dunavant_positions
+
+def check_triangle_pair_singularity(rwgs):
+    # Step 1: Expand rwgs to triangle vertices
+    # rwgs structure: [common_vertex_0, common_vertex_1, non_common_vertex_1st_triangle, non_common_vertex_2nd_triangle]
+    N = rwgs.shape[0]
+    triangle_pairs = np.ones((N, N, 4, 3), dtype=int)  # Shape: (N, N, 4 pairs, 3 vertices per triangle)
+    
+    # Extract vertices indices for each triangle in every RWG pair
+    for n in range(N):
+        for i in range(n,N):
+            triangle_pairs[n, i, 0, :] = [rwgs[n, 0], rwgs[n, 1], rwgs[n, 2]]  # Triangle 1 of RWG n
+            triangle_pairs[n, i, 1, :] = [rwgs[n, 0], rwgs[n, 1], rwgs[n, 3]]  # Triangle 2 of RWG n
+            triangle_pairs[n, i, 2, :] = [rwgs[i, 0], rwgs[i, 1], rwgs[i, 2]]  # Triangle 1 of RWG i
+            triangle_pairs[n, i, 3, :] = [rwgs[i, 0], rwgs[i, 1], rwgs[i, 3]]  # Triangle 2 of RWG i
+
+    # Step 2: Vectorized Singularity Check
+    singularities_map = np.zeros((N, N, 4), dtype=bool)  # Shape: (N, N, 4 pairs)
+    
+    for t1 in range(2):
+        for t2 in range(2, 4):
+            t1_vertices = triangle_pairs[:, :, t1, :].reshape(N, N, 1, 3)
+            t2_vertices = triangle_pairs[:, :, t2, :].reshape(N, N, 3, 1)
+            # Check if any vertex is shared between t1 and t2 triangles of each RWG pair
+            singularities_map[:, :, 2*t1+t2-2] = np.any(np.any(t1_vertices == t2_vertices, axis=-1), axis=-1)
+
+    return singularities_map
 
 class Mesh:
     """Class holding all triangles from a mesh file"""
 
     def __init__(self, path, verbose=False, properties=None):
-        start = datetime.now()
 
         if verbose:
             print("Opening mesh file...")
@@ -276,11 +317,6 @@ class Mesh:
             assert len(triangle.neighbors) == 3, "There exist triangles that do not have 3 neighbors"
 
         self.n_edges = len(edge_objects)
-
-        stop = datetime.now()
-
-        if verbose:
-            print("Successfully parsed the mesh file in " + str(stop - start))
 
     def __str__(self):
         return "Mesh structure containing " + str(len(self.objects)) + " objects."
@@ -571,7 +607,6 @@ class Mesh:
                         inner_edges[q, 2] - inner_edges[q, 5]) ** 2)
 
         return inner_edges_length, inner_edges, no_inner_edges, area_triangle
-
 
     def plot_current(self, currents_on_edge, e_vertex, dir,polarization): # Function to plot the current/Efield values over the edges
 

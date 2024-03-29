@@ -1,5 +1,5 @@
 import numpy as np
-from integrators.dunavant.Dunavant_Values import dunavant_values
+from integrators.dunavant.dunavant_values import dunavant_values
 
 def apply_rotations(values):
     w, alpha, beta, gamma, degeneracy = (
@@ -63,7 +63,7 @@ def initialize_order_values():
         values['w'], values['alpha'], values['beta'], values['gamma'] = w, alpha, beta, gamma
     return dunavant_values
 
-def get_Dunavant_values(order):
+def get_dunavant_values(order):
     values = dunavant_values[order]
     return np.vstack([values['alpha'],values['beta'],values['gamma']]).T, values['w']
 
