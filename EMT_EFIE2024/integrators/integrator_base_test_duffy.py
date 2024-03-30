@@ -1,4 +1,5 @@
 import numpy as np
+from Timer import Timer
 
 class Integrator_base_test_duffy():
     def __init__(self,k,Gauss_order,dunavant_values,dunavant_weight):
@@ -88,51 +89,52 @@ class Integrator_base_test_duffy():
         return Int
     
     def integrate_base_test(self,T1,T2,A1,A2,dunavant_positions1):
-        vector_2_3 = np.subtract(T2[1],T2[0])   #length of side 1 from vertex 2 to 3
-        vector_1_2 = np.subtract(T2[2],T2[1])   #length of side 2 from vertex 1 to 2
-        cross1=np.cross(vector_2_3,vector_1_2)
-        n = np.divide(cross1,np.linalg.norm(cross1)) #normal of triangle 2
-        
-        common_edge_length_t1 = np.linalg.norm(T1[1]-T1[0]) #length of common edge RWG
-        common_edge_legnth_t2 = np.linalg.norm(vector_2_3) #length of common edge RWG\
-        
-        Test = common_edge_length_t1/(2*A1)*(dunavant_positions1-T1[2])
-        
-        Divergence_basis_test = 1/(1j*self.k)*common_edge_legnth_t2/A2*common_edge_length_t1/A1 #Divergence of test function, scalar so no need to make it a function
+        with Timer('Duffy, one integral'):
+            vector_2_3 = np.subtract(T2[1],T2[0])   #length of side 1 from vertex 2 to 3
+            vector_1_2 = np.subtract(T2[2],T2[1])   #length of side 2 from vertex 1 to 2
+            cross1=np.cross(vector_2_3,vector_1_2)
+            n = np.divide(cross1,np.linalg.norm(cross1)) #normal of triangle 2
+            
+            common_edge_length_t1 = np.linalg.norm(T1[1]-T1[0]) #length of common edge RWG
+            common_edge_legnth_t2 = np.linalg.norm(vector_2_3) #length of common edge RWG\
+            
+            Test = common_edge_length_t1/(2*A1)*(dunavant_positions1-T1[2])
+            
+            Divergence_basis_test = 1/(1j*self.k)*common_edge_legnth_t2/A2*common_edge_length_t1/A1 #Divergence of test function, scalar so no need to make it a function
 
-        # location of the obervation point projected on triangle 2.
-        difference = T2[0]-dunavant_positions1
+            # location of the obervation point projected on triangle 2.
+            difference = T2[0]-dunavant_positions1
 
-        # Calculate the dot product of n with each row of the difference. The reshape ensures compatibility.
-        dot_product = np.dot(difference, n.reshape(-1, 1)).reshape(-1) # Reshape to (P,) for broadcasting
+            # Calculate the dot product of n with each row of the difference. The reshape ensures compatibility.
+            dot_product = np.dot(difference, n.reshape(-1, 1)).reshape(-1) # Reshape to (P,) for broadcasting
 
-        # Multiply by n (broadcasted automatically) and add to the original positions
-        proj = dunavant_positions1 + np.outer(dot_product / np.linalg.norm(n)**2, n)
-        z = np.linalg.norm(dunavant_positions1-proj, axis=1)[:,None]
+            # Multiply by n (broadcasted automatically) and add to the original positions
+            proj = dunavant_positions1 + np.outer(dot_product / np.linalg.norm(n)**2, n)
+            z = np.linalg.norm(dunavant_positions1-proj, axis=1)[:,None]
 
-        def basis_test():
-            def integrand(rp):
-                basis = common_edge_legnth_t2 / (2*A2)*(rp-T2[2])
-                return 1j*self.k*np.einsum('pqkc,pc->pqk',basis,Test)
-            return integrand
+            def basis_test():
+                def integrand(rp):
+                    basis = common_edge_legnth_t2 / (2*A2)*(rp-T2[2])
+                    return 1j*self.k*np.einsum('pqkc,pc->pqk',basis,Test)
+                return integrand
 
-        #Function to integrate the first integral this is the hypersingular equation where the divergences are taken into account. Therefroe the function given is 1 as the divergence is multiplied later as this is a constant.
-        #The summation is implemented three times to calculate all the three domains of triangle 2 using duffy.
+            #Function to integrate the first integral this is the hypersingular equation where the divergences are taken into account. Therefroe the function given is 1 as the divergence is multiplied later as this is a constant.
+            #The summation is implemented three times to calculate all the three domains of triangle 2 using duffy.
 
-        Integrand_triangle_1 = sum([
-            self.EvaluateSubtriangle(proj,T2[1],T2[2],z,n,Divergence_basis_test),
-            self.EvaluateSubtriangle(proj,T2[2],T2[0],z,n,Divergence_basis_test),
-            self.EvaluateSubtriangle(proj,T2[0],T2[1],z,n,Divergence_basis_test)
-        ])
+            Integrand_triangle_1 = sum([
+                self.EvaluateSubtriangle(proj,T2[1],T2[2],z,n,Divergence_basis_test),
+                self.EvaluateSubtriangle(proj,T2[2],T2[0],z,n,Divergence_basis_test),
+                self.EvaluateSubtriangle(proj,T2[0],T2[1],z,n,Divergence_basis_test)
+            ])
 
-        integrand_function = basis_test()
+            integrand_function = basis_test()
 
-        Integrand_triangle_2 = sum([
-            self.EvaluateSubtriangle(proj,T2[1],T2[2],z,n,integrand_function),
-            self.EvaluateSubtriangle(proj,T2[2],T2[0],z,n,integrand_function),
-            self.EvaluateSubtriangle(proj,T2[0],T2[1],z,n,integrand_function)
-        ])
+            Integrand_triangle_2 = sum([
+                self.EvaluateSubtriangle(proj,T2[1],T2[2],z,n,integrand_function),
+                self.EvaluateSubtriangle(proj,T2[2],T2[0],z,n,integrand_function),
+                self.EvaluateSubtriangle(proj,T2[0],T2[1],z,n,integrand_function)
+            ])
 
-        I_HS = np.sum(Integrand_triangle_1[:, None] * self.dunavant_weight_expanded)
-        I_S = np.sum(Integrand_triangle_2[:, None] * self.dunavant_weight_expanded)
-        return A1*(I_HS+I_S)
+            I_HS = np.sum(Integrand_triangle_1[:, None] * self.dunavant_weight_expanded)
+            I_S = np.sum(Integrand_triangle_2[:, None] * self.dunavant_weight_expanded)
+            return A1*(I_HS+I_S)
