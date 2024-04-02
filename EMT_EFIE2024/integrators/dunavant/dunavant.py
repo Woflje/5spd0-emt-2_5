@@ -1,6 +1,77 @@
 import numpy as np
 from integrators.dunavant.dunavant_values import dunavant_values
 
+def apply_rotations_new(values):
+    w, alpha, beta, gamma, degeneracy = (
+        np.array(values['w']), 
+        np.array(values['alpha']), 
+        np.array(values['beta']), 
+        np.array(values['gamma']), 
+        values['degeneracy']
+    )
+
+    rotated_alpha = []
+    rotated_beta = []
+    rotated_gamma = []
+    rotated_weights = []
+    
+    rotated_alpha.append(alpha[0])
+    rotated_beta.append(beta[0])
+    rotated_gamma.append(gamma[0])
+    rotated_weights.append(w[0])
+    
+    for y in range(degeneracy[1]):
+        it = y+degeneracy[0]
+        rotated_alpha.append(alpha[it])
+        rotated_beta.append(beta[it])
+        rotated_gamma.append(gamma[it])
+        rotated_weights.append(w[it])
+        
+        rotated_alpha.append(gamma[it])
+        rotated_beta.append(alpha[it])
+        rotated_gamma.append(beta[it])
+        rotated_weights.append(w[it])
+        
+        rotated_alpha.append(beta[it])
+        rotated_beta.append(gamma[it])
+        rotated_gamma.append(alpha[it])
+        rotated_weights.append(w[it])
+        
+    for z in range(degeneracy[2]):
+        it = z+degeneracy[1]+degeneracy[0]
+        rotated_alpha.append(alpha[it])
+        rotated_beta.append(beta[it])
+        rotated_gamma.append(gamma[it])
+        rotated_weights.append(w[it])
+        
+        rotated_alpha.append(gamma[it])
+        rotated_beta.append(alpha[it])
+        rotated_gamma.append(beta[it])
+        rotated_weights.append(w[it])
+        
+        rotated_alpha.append(beta[it])
+        rotated_beta.append(gamma[it])
+        rotated_gamma.append(alpha[it])
+        rotated_weights.append(w[it])
+        
+        rotated_alpha.append(alpha[it])
+        rotated_beta.append(gamma[it])
+        rotated_gamma.append(beta[it])
+        rotated_weights.append(w[it])
+        
+        rotated_alpha.append(gamma[it])
+        rotated_beta.append(beta[it])
+        rotated_gamma.append(alpha[it])
+        rotated_weights.append(w[it])
+        
+        rotated_alpha.append(beta[it])
+        rotated_beta.append(alpha[it])
+        rotated_gamma.append(gamma[it])
+        rotated_weights.append(w[it])
+    
+    return (np.array(rotated_weights), np.array(rotated_alpha), 
+            np.array(rotated_beta), np.array(rotated_gamma))
+
 def apply_rotations(values):
     w, alpha, beta, gamma, degeneracy = (
         np.array(values['w']), 
@@ -59,7 +130,7 @@ def apply_rotations(values):
 
 def initialize_order_values():
     for order, values in dunavant_values.items():
-        w, alpha, beta, gamma = apply_rotations(values)
+        w, alpha, beta, gamma = apply_rotations_new(values)
         values['w'], values['alpha'], values['beta'], values['gamma'] = w, alpha, beta, gamma
     return dunavant_values
 

@@ -1,13 +1,16 @@
 from datetime import datetime as dt
 
 class Timer:
-    def __init__(self, name=None):
+    def __init__(self, name=None, announce_start=False):
         self.name = name
         self.start_time = None
         self.end_time = None
+        self.announce_start = announce_start
 
     def __enter__(self):
         self.start_time = dt.now()
+        if self.announce_start:
+            print(f"Timer {self.name}' starting at {dt.now()}")
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -17,3 +20,6 @@ class Timer:
             print(f"Timer '{self.name}' elapsed time: {self.elapsed_time}")
         else:
             print(f"Elapsed time: {self.elapsed_time}")
+
+def timestamp(name):
+    print(f"Timestamp '{name}' at {dt.now()}")

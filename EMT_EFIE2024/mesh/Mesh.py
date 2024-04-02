@@ -16,6 +16,7 @@ def calculate_triangle_area(vertices):
     return np.sqrt(s * (s - a) * (s - b) * (s - c))
 
 def restructure_mesh_rwg_data(r_vect, dunavant_values):
+    N = len(r_vect)
     # Flatten r_vect to get all vertices and deduplicate to get unique vertices
     all_vertices = r_vect.reshape(-1, 3)
     unique_vertices, inverse_indices = np.unique(all_vertices, axis=0, return_inverse=True)
@@ -24,9 +25,8 @@ def restructure_mesh_rwg_data(r_vect, dunavant_values):
     mapped_indices = inverse_indices.reshape(r_vect.shape[0], r_vect.shape[1])
 
     # Initialize structures
-    rwgs = np.zeros((len(r_vect), 6), dtype=int)  # Mapping indices
+    rwgs = np.zeros((N, 6), dtype=int)  # Mapping indices
     areas = []  # To store areas of each triangle
-    positions = []  # To store positions (P, 3) for each triangle
 
     triangle_tracker = {}  # Tracks whether a triangle has been processed
 
@@ -40,8 +40,6 @@ def restructure_mesh_rwg_data(r_vect, dunavant_values):
                 vertices = unique_vertices[list(triangle_key)]
                 area = calculate_triangle_area(vertices)
                 areas.append(area)
-                # Directly use the corresponding dunavant positions data, assuming it matches the processing order
-                positions.append(np.dot(dunavant_values, vertices))
 
                 # Track this triangle's index
                 triangle_tracker[triangle_key] = len(areas) - 1
@@ -50,8 +48,12 @@ def restructure_mesh_rwg_data(r_vect, dunavant_values):
             rwgs[i, 4 + (j - 2)] = triangle_tracker[triangle_key]  # Triangle index
 
     areas = np.array(areas)
-    dunavant_positions = np.array(positions)  # Convert to a structured NumPy array
 
+    dunavant_positions = np.zeros((N,2,dunavant_values.shape[0],3))
+    for n in range(N):
+        for t in range(2):
+            dunavant_positions[n,t] = np.dot(dunavant_values,unique_vertices[rwgs[n,[0,1,t+2]]])
+    
     return unique_vertices, rwgs, areas, dunavant_positions
 
 def check_triangle_pair_singularity(rwgs):

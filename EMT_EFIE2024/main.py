@@ -7,11 +7,13 @@ from integrators.integration import int_test
 from plot import plot_phi, plot_theta
 from mesh.Mesh import Mesh, check_triangle_pair_singularity, restructure_mesh_rwg_data
 from E_field import E_field_in_position, E_field_essentials
-from Timer import Timer
+from Timer import Timer, timestamp
 
 from scipy.io import savemat
 
 from parameters import parameters
+
+timestamp('Start code')
 
 # Initialize the constants
 k = 2*np.pi/parameters["wavelength"]
@@ -21,7 +23,7 @@ dunavant_values, dunavant_weight = get_dunavant_values(parameters["order_dunavan
 
 # Intialize the integrators for the given wavelength
 dunavant = Integrator_base_test_dunavant(k,dunavant_weight)
-duffy = Integrator_base_test_duffy(k,parameters["order_Gauss_duffy"],dunavant_values,dunavant_weight)
+duffy = Integrator_base_test_duffy(k,parameters["order_Gauss_duffy"],dunavant_weight)
 
 # Initialize the code which creates the mesh of the input object and sorts all edges
 mesh = Mesh(parameters["input_mesh_path"])
@@ -35,7 +37,30 @@ if parameters["plots"]:
 [length, e_vertex, other_vertex, area] = mesh.getmatrix()
 N = len(e_vertex)
 
+
 r_vect = np.array([e_vertex[:, :3], e_vertex[:, 3:], other_vertex[:, :3], other_vertex[:, 3:]]).transpose(1, 0, 2)
+
+# r_vect = np.array([
+#         [
+#             [0., 0., 0.],
+#             [0., 3., 0.],
+#             [3., 0., 0.],
+#             [-3., 0., 1.]
+#         ],
+#         [
+#             [0., 0., 0.],
+#             [-3., 0., 1.],
+#             [0., 3., 0.],
+#             [-2., -1., 4.]
+#         ],
+#         [
+#             [-3., 2., 1.],
+#             [-2., -1., 4.],
+#             [0., 0., 0.],
+#             [-6., -2., 5.]
+#         ],
+#     ])
+# N = 3
 
 vertices, rwgs, areas, dunavant_positions = restructure_mesh_rwg_data(r_vect, dunavant_values)
 
@@ -49,43 +74,50 @@ def Efield_in(pos):
 #  Integrate the incident electric field over all test functions
 
 for n in range(N):
-    E[n] = int_test(Efield_in,vertices[rwgs[n,0:3]],areas[rwgs[n,4]],dunavant_positions[rwgs[n,4]],dunavant_weight)\
-          - int_test(Efield_in,vertices[rwgs[n,[0,1,3]]],areas[rwgs[n,5]],dunavant_positions[rwgs[n,5]],dunavant_weight) #integral E(r)*t(r) dr over surface triangle
+    E[n] = int_test(Efield_in,vertices[rwgs[n,0:3]],areas[rwgs[n,4]],dunavant_positions[n,0],dunavant_weight)\
+          - int_test(Efield_in,vertices[rwgs[n,[0,1,3]]],areas[rwgs[n,5]],dunavant_positions[n,1],dunavant_weight) #integral E(r)*t(r) dr over surface triangle
 
 # Plot the incident electric field over the inner edges
 if parameters["plots"]:
     mesh.plot_current(E,e_vertex,parameters["E_field_in"]["direction"],parameters["E_field_in"]["polarization"])
-
 # Create system Matrix
 A = (N,N)
 A = np.zeros(A,dtype=np.complex128)
 
 singularities_map = check_triangle_pair_singularity(rwgs)
 
-print('Starting integration')
-with Timer('Integration'):
+
+with Timer('Integration',True):
     for n in range(N):
         for i in range(n,N):
             for t1 in range(2,4):
                 for t2 in range(2,4):
                     factor = 1 if t1 == t2 else -1
+                    T1 = rwgs[n,[0,1,t1]]
+                    T2 = rwgs[i,[0,1,t2]]
                     if singularities_map[n,i,2*t1+t2-6]:
-                        A[n,i] = A[n,i]+factor*4*np.pi*duffy.integrate_base_test(
-                            vertices[rwgs[n,[0,1,t1]]],
-                            vertices[rwgs[i,[0,1,t2]]],
+                    # if np.isin(T1, T2).any():
+                        integral_duffy = duffy.integrate_base_test(
+                            vertices[T1],
+                            vertices[T2],
                             areas[rwgs[n,t1+2]],
                             areas[rwgs[i,t2+2]],
-                            dunavant_positions[rwgs[n,t1+2]]
+                            dunavant_positions[n,t1-2]
                             )
+                        A[n,i] = A[n,i]+factor*4*np.pi*integral_duffy
+                        # print(f"Factor = {factor} | n={n} i={i} t1={t1} t2={t2} duffy={integral_duffy} total={factor*4*np.pi*integral_duffy}")
                     else:
-                        A[n,i] = A[n,i]+factor*4*np.pi*dunavant.integrate_base_test(
-                            vertices[rwgs[n,[0,1,t1]]],
-                            vertices[rwgs[i,[0,1,t2]]],
+                        integral_dunavant = dunavant.integrate_base_test(
+                            vertices[T1],
+                            vertices[T2],
                             areas[rwgs[n,t1+2]],
                             areas[rwgs[i,t2+2]],
-                            dunavant_positions[rwgs[n,t1+2]],
-                            dunavant_positions[rwgs[i,t2+2]]
+                            dunavant_positions[n,t1-2],
+                            dunavant_positions[i,t2-2]
                             )
+                        A[n,i] = A[n,i]+factor*4*np.pi*integral_dunavant
+                        # print(f"Factor = {factor} | n={n} i={i} t1={t1} t2={t2} dunavant={integral_dunavant} total={factor*4*np.pi*integral_dunavant}")
+                    
 
 del dunavant
 del duffy
@@ -100,9 +132,11 @@ J = np.dot(np.linalg.inv(A),E)
 # Plot the currents over the inner edges
 if parameters["plots"]:
     mesh.plot_current(J, e_vertex, parameters["E_field_in"]["direction"], parameters["E_field_in"]["polarization"])
-#%%
+
+
 # Start of the post-processing
-with Timer('Farfield processing'):
+
+with Timer('Farfield processing',True):
     n = 0
     E_ff = np.zeros([N,1],dtype=np.complex128)
     E_farfield = np.zeros((1,np.size(parameters["E_farfield"]["direction"][0]), np.size(parameters["E_farfield"]["direction"][1]), np.size(parameters["E_farfield"]["polarization"])),dtype=np.complex128)
@@ -118,7 +152,7 @@ with Timer('Farfield processing'):
                 n = 0
                 E_ff = np.zeros([N,1],dtype=np.complex128)
                 while n<N:
-                    E_ff[n] = J[n]*(int_test(Efield_ff,vertices[rwgs[n,0:3]],areas[rwgs[n,4]],dunavant_positions[rwgs[n,4]],dunavant_weight) - int_test(Efield_ff,vertices[rwgs[n,[0,1,3]]],areas[rwgs[n,5]],dunavant_positions[rwgs[n,5]],dunavant_weight))  #integral E(r)*t(r) dr over surface triangle
+                    E_ff[n] = J[n]*(int_test(Efield_ff,vertices[rwgs[n,0:3]],areas[rwgs[n,4]],dunavant_positions[n,0],dunavant_weight) - int_test(Efield_ff,vertices[rwgs[n,[0,1,3]]],areas[rwgs[n,5]],dunavant_positions[n,1],dunavant_weight))  #integral E(r)*t(r) dr over surface triangle
                     n=n+1
 
                 # Sum all farfield contributions for a single location
@@ -131,7 +165,9 @@ if parameters["plots"]:
 
 # Finalization of the code and delete of all integrator instances
 
+E_farfield_output_name = f"E_farfield_matrix_{parameters['input_mesh_path'].split('.')[0].split('/')[-1]}"
+
 mymat = {
-    "E_farfield": E_farfield
+    E_farfield_output_name: E_farfield
 }
-savemat("farfield_matrix.mat",mymat)
+savemat(f"{E_farfield_output_name}.mat",mymat)
