@@ -12,7 +12,6 @@ class Integrator_base_test_duffy():
         self.Gauss_zeta = 0.5*(Gauss[0]+1)
         self.Gauss_zeta_complement = 1-self.Gauss_zeta
         self.Gauss_weight_outer = np.outer(self.Gauss_weight, self.Gauss_weight)
-        self.Gauss_length = len(self.Gauss_zeta)
 
     def EvaluateSubtriangle(self, r0, r1, r2, z, n, integrand):
         # Basic vector operations
@@ -63,16 +62,10 @@ class Integrator_base_test_duffy():
         U = np.einsum('i,jk->jik', 1 - self.Gauss_zeta, U_low) + np.einsum('i,jk->jik', self.Gauss_zeta, U_up)
 
         R = r_eff[:,np.newaxis,:] * np.cosh(U)
-
-        # n_dot_n_hat = np.sum(n * n_hat, axis=1)
         n_dot_nhat = np.dot(n, n_hat.T)
         
-        # h1_norm_expanded = h1_norm[:, None, None]
         U_diff = U_up - U_low
 
-        # const = self.Gauss_weight_outer * h1_norm_expanded * U_diff[:, :, None]
-        P = self.dunavant_length
-        Q = self.Gauss_length
         const = self.Gauss_weight_outer * h1_norm[:,np.newaxis,np.newaxis] * U_diff[:,np.newaxis,:]
 
         exp_term = np.exp(-1j * self.k * R)
@@ -80,37 +73,12 @@ class Integrator_base_test_duffy():
         # Integration over the Gauss points
         if not callable(integrand):
             Int = np.sum(n_dot_nhat[:, None, None] * const * integrand / (4 * np.pi) * exp_term, axis=(1, 2))
-            # Int = np.zeros((P),dtype='complex128')
-            # for r in range(P):
-            #     for i in range(Q):
-            #         for j in range(Q):
-            #             temp = n_dot_nhat[r] * const[r][i][j] * integrand / (4 * np.pi) * exp_term[r][i][j]
-            #             Int[r]+=temp
         else:
             x_hat = np.cross(h1_hat, n_hat)
             x_p = r_eff[:,np.newaxis,:]*np.sinh(U)
-
             outer_product = (yp[:, :, np.newaxis] * h1_hat[:, np.newaxis, :]).reshape(yp.shape[0], 1, yp.shape[1], 3)
             m_x_p_x_hat = x_p[:, :, :, np.newaxis] * x_hat[:, np.newaxis, np.newaxis, :]
-
-            # outer_product = np.zeros((P,1,Q,3))
-            # m_x_p_x_hat = np.zeros((P,Q,Q,3))
-            # for r in range(P):
-            #     for i in range(Q):
-            #         for j in range(Q):
-            #             outer_product[r][0][j] = yp[r][j]*h1_hat[r]
-            #             m_x_p_x_hat[r][i][j] = x_p[r][i][j] * x_hat[r]
-            # outer_product = yp[..., None] * h1_hat[:, None]
-            # rp = r0[:, None, None] + x_p[..., None] * x_hat[:, None, None] + outer_product[:, :, None]
             rp = r0[:, None, None] + m_x_p_x_hat + outer_product
-            
-            # temp = n_dot_nhat[:, None, None] * const * integrand(rp) / (4 * np.pi) * exp_term
-            # Int = np.zeros((P),dtype='complex128')
-            # for r in range(P):
-            #     for i in range(Q):
-            #         for j in range(Q):
-            #             temp = n_dot_nhat[r] * const[r][i][j] * integrand(rp)[r][i][j] / (4 * np.pi) * exp_term[r][i][j]
-            #             Int[r]+=temp
             Int = np.sum(n_dot_nhat[:, None, None] * const * integrand(rp) / (4 * np.pi) * exp_term, axis=(1, 2))
         Int[colinear_indices]=0
         return Int

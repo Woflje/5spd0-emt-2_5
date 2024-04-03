@@ -4,8 +4,8 @@ close all;
 
 
 %%%%%%%%%% Load mat files from Python code and obtain fields %%%%%%%%%
-load('E_farfield_matrix_sphere_z_offset_test09.mat');
-Eff_new = E_farfield_matrix_spher(1,1:180);
+load('E_farfield_matrix_sphere_z_offset_test10.mat');
+Eff_new = E_farfield_matrix_sphere_z_offset(1,1:180);
 load('E_farfield_matrix_sphere_z_offset_old.mat');
 Eff_old = E_farfield(1,1:180);
 
@@ -21,6 +21,6 @@ legend('$|E_{new}|$ [V/m]','$|E_{old}|$ [V/m]','interpreter','latex')
 grid on
 
 figure(2)
-plot(theta/pi*180,Eff_diff)
+plot(theta,Eff_diff)
 xlabel('$\theta$ [$^{\circ}$]','Interpreter','latex')
 grid on

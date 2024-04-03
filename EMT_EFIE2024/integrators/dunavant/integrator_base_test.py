@@ -30,36 +30,3 @@ class Integrator_base_test_dunavant():
         result = result_integral1+result_integral2
 
         return result
-    
-    def integrate_base_test_loop(self,T1,T2,A1,A2,dunavant_pos1,dunavant_pos2):
-        length1 = np.linalg.norm(T1[1]-T1[0]) #length common edge rwg 1
-        length2 = np.linalg.norm(T2[1]-T2[0]) #length common edge rwg 2
-
-        temp1 = []
-        #part 1
-        for r in dunavant_pos1:
-            temp2 = []
-            for rp in dunavant_pos2:
-                norm = np.linalg.norm(np.subtract(r,rp))
-                scalar_green = np.exp(-1j*self.k*norm)/(4*np.pi*norm)
-                part1 = 1/(1j*self.k)*length2/A2*length1/A1*scalar_green
-                temp2.append(part1)
-            temp1.append(A2*sum(np.multiply(temp2,self.dunavant_weight)))
-        result_integral1 = A1*sum(np.multiply(temp1,self.dunavant_weight))
-
-        temp1 = []
-        #part 2
-        for r in dunavant_pos1:
-            temp2 = []
-            for rp in dunavant_pos2:
-                norm = np.linalg.norm(np.subtract(r,rp))
-                scalar_green = np.exp(-1j*self.k*norm)/(4*np.pi*norm)
-                term1 = length1/(2*A1)*(r-T1[2])
-                term2 = length1/(2*A2)*(rp-T2[2])
-                part2 = 1j*self.k*np.dot(term1,term2)*scalar_green
-                temp2.append(part2)
-            temp1.append(A2*sum(np.multiply(temp2,self.dunavant_weight)))
-        result_integral2 = A1*sum(np.multiply(temp1,self.dunavant_weight))
-        
-        result = result_integral1+result_integral2
-        return result
