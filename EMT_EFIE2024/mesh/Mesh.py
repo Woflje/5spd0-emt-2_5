@@ -367,33 +367,6 @@ class Mesh:
         if all_x and all_y and all_z:  # Ensure there is data to process
             all_vertices = np.array([all_x, all_y, all_z]).T
             self.array1_reshape = all_vertices.reshape(-1, 9)  # Assuming this matches the original intent
-
-
-    def plot_objects(self):
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        
-        for obj_data in self.plot_data:
-            for triangle_data in obj_data['vertices_data']:
-                vertices = triangle_data['vertices']
-                x, y, z = vertices[:,0], vertices[:,1], vertices[:,2]
-
-                # Plot the triangles
-                ax.plot_trisurf(x, y, z, linewidth=0.2, color='blue', edgecolor='black', shade=True)
-            
-            if 'mean_normals' in obj_data and obj_data['mean_normals']:
-                for mean_x, mean_y, mean_z, nx, ny, nz, length in obj_data['mean_normals']:
-                    ax.quiver(mean_x, mean_y, mean_z, nx, ny, nz, length=length, color='red')
-        
-        # Set axes limits
-        ax.set_xlim(*self.plot_limits['x'])
-        ax.set_ylim(*self.plot_limits['y'])
-        ax.set_zlim(*self.plot_limits['z'])
-
-        ax.set_xlabel('X axis')
-        ax.set_ylabel('Y axis')
-        ax.set_zlabel('Z axis')
-        plt.show()
         
     def getmatrix(self):
 

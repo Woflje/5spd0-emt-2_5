@@ -1,5 +1,5 @@
 import numpy as np
-
+import Basic_Integrator as simple_int
 from integrators.dunavant.integrator_base_test import Integrator_base_test_dunavant
 from integrators.integrator_base_test_duffy import Integrator_base_test_duffy
 from integrators.dunavant.dunavant import get_dunavant_values
@@ -7,7 +7,7 @@ from plot import plot_phi, plot_theta
 from mesh.Mesh import Mesh, check_triangle_pair_singularity, restructure_mesh_rwg_data
 from E_field import E_field
 from Timer import Timer, timestamp
-
+import EFIE_functions as EF
 from scipy.io import savemat
 
 from parameters import parameters
@@ -27,8 +27,7 @@ duffy = Integrator_base_test_duffy(k,parameters["order_Gauss_duffy"],dunavant_we
 # Initialize the code which creates the mesh of the input object and sorts all edges
 mesh = Mesh(parameters["input_mesh_path"])
 mesh.prepare_plot_data()  # Always run .plot() because the edge sorting is done here
-if parameters["plots"]:
-    mesh.plot_objects()
+
 
 # Load all edges in r_vect with a xyz for each of the 3 vertices of a Triangle
 #  r_vect has N elements for each inner edge with 4 vertices: 0 and 1 for the inner edge and 2 and 3 for the two other vertices that make the 2 triangles
@@ -95,14 +94,50 @@ if parameters["plots"]:
 # Start of the post-processing
 
 with Timer('Farfield processing',True):
+    # n = 0
+    # E_farfield = np.zeros((1,np.size(parameters["E_farfield"]["direction"][0]), np.size(parameters["E_farfield"]["direction"][1]), np.size(parameters["E_farfield"]["polarization"])),dtype=np.complex128)
+
+    # # For reach range of theta, phi or polarization calculate the farfield Efield
+    # for a in range(np.size(parameters["E_farfield"]["direction"][0])):
+    #     for b in range(np.size(parameters["E_farfield"]["direction"][1])):
+    #         for c in range(np.size(parameters["E_farfield"]["polarization"])):
+    #             E_ff = J*E_field(vertices, rwgs, areas, dunavant_positions, k, parameters["E_field_in"]["amplitude"], [parameters["E_farfield"]["direction"][0][a],parameters["E_farfield"]["direction"][1][b]], parameters["E_farfield"]["polarization"][c], dunavant_weight)
+
+    #             # Sum all farfield contributions for a single location
+    #             E_farfield[0,a,b,c] = np.sum(E_ff)
+
+    wavelength = 100
+    input_mesh = "examples/sphere_z_offset.dat"
+    input_EFIELD_AMPLITUDE = 1
+    input_EFIELD_DIRECTION = [np.pi/4,np.pi/4]  #angle: phi, theta
+    input_EFIELD_POLARIZATION = np.pi/4  #angle of polarization relative to phi and theta
+
+    #input_FARFIELD_DIRECTION = np.array([np.linspace(0.001,2*np.pi,180), np.array([np.pi/2.])]) #angle: phi, theta
+    input_FARFIELD_DIRECTION = [np.array([np.pi*2.]), np.linspace(0.001,2*np.pi,180)] #angle: phi, theta
+    # input_FARFIELD_DIRECTION = np.array([np.array([np.pi*2.]), np.linspace(0.001,2*np.pi,180)]) #angle: phi, theta
+    input_FARFIELD_POLARIZATION = np.array([0]) #angle of polarization relative to phi and theta
+
+    simple = simple_int.Basic_Integrator(5)
+
+    # Initialize the constants
+    k = 2*np.pi/wavelength
+
     n = 0
-    E_farfield = np.zeros((1,np.size(parameters["E_farfield"]["direction"][0]), np.size(parameters["E_farfield"]["direction"][1]), np.size(parameters["E_farfield"]["polarization"])),dtype=np.complex128)
+    E_ff = np.zeros([N,1],dtype=np.complex128)
+    E_farfield = np.zeros((1,np.size(input_FARFIELD_DIRECTION[0]), np.size(input_FARFIELD_DIRECTION[1]), np.size(input_FARFIELD_POLARIZATION)),dtype=np.complex128)
 
     # For reach range of theta, phi or polarization calculate the farfield Efield
-    for a in range(np.size(parameters["E_farfield"]["direction"][0])):
-        for b in range(np.size(parameters["E_farfield"]["direction"][1])):
-            for c in range(np.size(parameters["E_farfield"]["polarization"])):
-                E_ff = J*E_field(vertices, rwgs, areas, dunavant_positions, k, parameters["E_field_in"]["amplitude"], [parameters["E_farfield"]["direction"][0][a],parameters["E_farfield"]["direction"][1][b]], parameters["E_farfield"]["polarization"][c], dunavant_weight)
+    for a in range(np.size(input_FARFIELD_DIRECTION[0])):
+        for b in range(np.size(input_FARFIELD_DIRECTION[1])):
+            for c in range(np.size(input_FARFIELD_POLARIZATION)):
+                # Calculate the farfield contribution of all edges
+                def Efield_ff(pos):
+                    return EF.E_in(input_EFIELD_AMPLITUDE, [input_FARFIELD_DIRECTION[0][a], input_FARFIELD_DIRECTION[1][b]], pos, input_FARFIELD_POLARIZATION[c], wavelength)
+                n = 0
+                E_ff = np.zeros([N,1],dtype=np.complex128)
+                while n<N:
+                    E_ff[n] = J[n]*(simple.int_test(Efield_ff,np.array([r_vect[n,0], r_vect[n,1], r_vect[n,2]])) - simple.int_test(Efield_ff,np.array([r_vect[n,0], r_vect[n,1], r_vect[n,3]])))  #integral E(r)*t(r) dr over surface triangle
+                    n=n+1
 
                 # Sum all farfield contributions for a single location
                 E_farfield[0,a,b,c] = np.sum(E_ff)
