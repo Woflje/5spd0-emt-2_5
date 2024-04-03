@@ -1,6 +1,9 @@
 import numpy as np
 parameters = {
     "plots": False,
+    "export_E_farfield": True,
+    "export_E_farfield_filename": "export/E_farfield",
+    "export_E_farfield_data_name": "E_farfield",
     "wavelength": 100,
     "input_mesh_path": "examples/tetrahedron.dat",
     "E_field_in": {

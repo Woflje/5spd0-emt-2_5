@@ -24,9 +24,8 @@ def restructure_mesh_rwg_data(r_vect, dunavant_values):
     # Map vertices in r_vect to unique vertices indices
     mapped_indices = inverse_indices.reshape(r_vect.shape[0], r_vect.shape[1])
 
-    # Initialize structures
-    rwgs = np.zeros((N, 6), dtype=int)  # Mapping indices
-    areas = []  # To store areas of each triangle
+    rwgs = np.zeros((N, 6), dtype=int) # Mapping indices
+    areas = []
 
     triangle_tracker = {}  # Tracks whether a triangle has been processed
 
@@ -49,18 +48,19 @@ def restructure_mesh_rwg_data(r_vect, dunavant_values):
 
     areas = np.array(areas)
 
+    # Dunavant positions are pre-computed for all triangles.
+    # These depend on the order of vertices in triangles and are therefore not unique per triangle, like areas
     dunavant_positions = np.zeros((N,2,dunavant_values.shape[0],3))
     for n in range(N):
         for t in range(2):
             dunavant_positions[n,t] = np.dot(dunavant_values,unique_vertices[rwgs[n,[0,1,t+2]]])
     
+    # rwgs structure: [common_vertex_0, common_vertex_1, non_common_vertex_1st_triangle, non_common_vertex_2nd_triangle, triangle_1_index, triangle_2_index]
     return unique_vertices, rwgs, areas, dunavant_positions
 
-def check_triangle_pair_singularity(rwgs):
-    # Step 1: Expand rwgs to triangle vertices
-    # rwgs structure: [common_vertex_0, common_vertex_1, non_common_vertex_1st_triangle, non_common_vertex_2nd_triangle]
+def check_triangle_pair_intersections(rwgs):
     N = rwgs.shape[0]
-    triangle_pairs = np.ones((N, N, 4, 3), dtype=int)  # Shape: (N, N, 4 pairs, 3 vertices per triangle)
+    triangle_pairs = np.ones((N, N, 4, 3), dtype=int)
     
     # Extract vertices indices for each triangle in every RWG pair
     for n in range(N):
@@ -70,8 +70,7 @@ def check_triangle_pair_singularity(rwgs):
             triangle_pairs[n, i, 2, :] = [rwgs[i, 0], rwgs[i, 1], rwgs[i, 2]]  # Triangle 1 of RWG i
             triangle_pairs[n, i, 3, :] = [rwgs[i, 0], rwgs[i, 1], rwgs[i, 3]]  # Triangle 2 of RWG i
 
-    # Step 2: Vectorized Singularity Check
-    singularities_map = np.zeros((N, N, 4), dtype=bool)  # Shape: (N, N, 4 pairs)
+    singularities_map = np.zeros((N, N, 4), dtype=bool)
     
     for t1 in range(2):
         for t2 in range(2, 4):
@@ -367,33 +366,6 @@ class Mesh:
         if all_x and all_y and all_z:  # Ensure there is data to process
             all_vertices = np.array([all_x, all_y, all_z]).T
             self.array1_reshape = all_vertices.reshape(-1, 9)  # Assuming this matches the original intent
-
-
-    def plot_objects(self):
-        fig = plt.figure()
-        ax = fig.add_subplot(111, projection='3d')
-        
-        for obj_data in self.plot_data:
-            for triangle_data in obj_data['vertices_data']:
-                vertices = triangle_data['vertices']
-                x, y, z = vertices[:,0], vertices[:,1], vertices[:,2]
-
-                # Plot the triangles
-                ax.plot_trisurf(x, y, z, linewidth=0.2, color='blue', edgecolor='black', shade=True)
-            
-            if 'mean_normals' in obj_data and obj_data['mean_normals']:
-                for mean_x, mean_y, mean_z, nx, ny, nz, length in obj_data['mean_normals']:
-                    ax.quiver(mean_x, mean_y, mean_z, nx, ny, nz, length=length, color='red')
-        
-        # Set axes limits
-        ax.set_xlim(*self.plot_limits['x'])
-        ax.set_ylim(*self.plot_limits['y'])
-        ax.set_zlim(*self.plot_limits['z'])
-
-        ax.set_xlabel('X axis')
-        ax.set_ylabel('Y axis')
-        ax.set_zlabel('Z axis')
-        plt.show()
         
     def getmatrix(self):
 

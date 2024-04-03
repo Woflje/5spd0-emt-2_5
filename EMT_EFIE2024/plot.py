@@ -1,8 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_phi(rad,E_farfield):  # Function to plot the farfield plot for a constant theta
-    # Create polar plot to plot in
+def plot_phi(rad,E_farfield): # Function to plot the farfield plot for a constant theta
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='polar')
 
@@ -13,11 +12,8 @@ def plot_phi(rad,E_farfield):  # Function to plot the farfield plot for a consta
     ax.set_xlabel('phi')
     ax.set_theta_zero_location("N")
     plt.show()
-    return
 
-
-def plot_theta(rad,E_farfield):  # Function to plot the farfield plot for a constant phi
-    # Create polar plot to plot in
+def plot_theta(rad,E_farfield): # Function to plot the farfield plot for a constant phi
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='polar')
 
@@ -28,5 +24,3 @@ def plot_theta(rad,E_farfield):  # Function to plot the farfield plot for a cons
     ax.set_xlabel('theta')
     ax.set_theta_zero_location("N")
     plt.show()
-
-    return
