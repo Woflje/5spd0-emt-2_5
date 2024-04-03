@@ -29,9 +29,6 @@ def E_field_essentials(k, direction, polarization_angle):
     final_polarization = final_polarization / np.linalg.norm(final_polarization)
     return k_vector, final_polarization
 
-def E_field_in_position(position, k_vector, polarization, amp):
-    return amp * polarization * np.exp(-1j * np.dot(k_vector, position))
-
 def E_field(vertices,rwgs,areas,dunavant_positions,k,amp,direction,polarization_angle,dunavant_weight):
 
     [k_vector, polarization] = E_field_essentials(k,direction,polarization_angle)

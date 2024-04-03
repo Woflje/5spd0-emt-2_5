@@ -3,10 +3,9 @@ import numpy as np
 from integrators.dunavant.integrator_base_test import Integrator_base_test_dunavant
 from integrators.integrator_base_test_duffy import Integrator_base_test_duffy
 from integrators.dunavant.dunavant import get_dunavant_values
-from integrators.integration import int_test
 from plot import plot_phi, plot_theta
 from mesh.Mesh import Mesh, check_triangle_pair_singularity, restructure_mesh_rwg_data
-from E_field import E_field_in_position, E_field_essentials, E_field
+from E_field import E_field
 from Timer import Timer, timestamp
 
 from scipy.io import savemat
@@ -42,64 +41,6 @@ r_vect = np.array([e_vertex[:, :3], e_vertex[:, 3:], other_vertex[:, :3], other_
 vertices, rwgs, areas, dunavant_positions = restructure_mesh_rwg_data(r_vect, dunavant_values)
 
 E = E_field(vertices, rwgs, areas, dunavant_positions, k, parameters["E_field_in"]["amplitude"], parameters["E_field_in"]["direction"], parameters["E_field_in"]["polarization"], dunavant_weight)
-
-
-# [E_in_k_vector, E_in_polarization] = E_field_essentials(k, parameters["E_field_in"]["direction"], parameters["E_field_in"]["polarization"])
-# E = np.zeros([N,1],dtype=np.complex128)
-
-# def Efield_in(pos):
-#     return E_field_in_position(pos, E_in_k_vector, E_in_polarization, parameters["E_field_in"]["amplitude"])
-
-# #  Integrate the incident electric field over all test functions
-
-# for n in range(N):
-#     E[n] = int_test(Efield_in,vertices[rwgs[n,0:3]],areas[rwgs[n,4]],dunavant_positions[n,0],dunavant_weight)\
-#           - int_test(Efield_in,vertices[rwgs[n,[0,1,3]]],areas[rwgs[n,5]],dunavant_positions[n,1],dunavant_weight) #integral E(r)*t(r) dr over surface triangle
-    
-# amp = parameters["E_field_in"]["amplitude"]
-# k_vector = E_in_k_vector
-# polarization = E_in_polarization
-# E2 = np.zeros([N,1],dtype=np.complex128)
-# P = dunavant_positions.shape[2]
-# for n in range(N):
-
-#     length_common_edge = np.linalg.norm(np.subtract(vertices[rwgs[n,0]],vertices[rwgs[n,1]]))
-
-#     dunavant_positions1 = dunavant_positions[n,0]
-#     T1 = vertices[rwgs[n,0:3]]
-#     A1 = areas[rwgs[n,4]]
-
-#     dot_product = np.einsum('i,pi->p', k_vector, dunavant_positions1)
-
-#     # Step 2: Compute 'temp' for all positions at once
-#     temp = amp * polarization[:, np.newaxis] * np.exp(-1j * dot_product)
-
-#     # Step 3: Compute 'temp2' for all positions at once
-#     diff_positions = dunavant_positions1 - T1[2]
-#     scaling_factor = length_common_edge / (2 * A1)
-#     temp2 = np.einsum('pi,pi->p', diff_positions * scaling_factor, temp.T)
-
-#     # Step 4: Compute 'E_t1' by summing over all 'temp2' elements, scaled by 'A1' and 'dunavant_weight'
-#     E_t1 = A1 * np.sum(temp2 * dunavant_weight)
-
-#     dunavant_positions2 = dunavant_positions[n,1]
-#     T2 = vertices[rwgs[n,[0,1,3]]]
-#     A2 = areas[rwgs[n,5]]
-
-#     dot_product = np.einsum('i,pi->p', k_vector, dunavant_positions2)
-
-#     # Step 2: Compute 'temp' for all positions at once
-#     temp = amp * polarization[:, np.newaxis] * np.exp(-1j * dot_product)
-
-#     # Step 3: Compute 'temp2' for all positions at once
-#     diff_positions = dunavant_positions2 - T2[2]
-#     scaling_factor = length_common_edge / (2 * A2)
-#     temp2 = np.einsum('pi,pi->p', diff_positions * scaling_factor, temp.T)
-
-#     # Step 4: Compute 'E_t1' by summing over all 'temp2' elements, scaled by 'A1' and 'dunavant_weight'
-#     E_t2 = A2 * np.sum(temp2 * dunavant_weight)
-
-#     E2[n] = E_t1 - E_t2
     
 
 # Plot the incident electric field over the inner edges

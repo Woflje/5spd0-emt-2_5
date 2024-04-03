@@ -2,7 +2,7 @@ import numpy as np
 parameters = {
     "plots": False,
     "wavelength": 100,
-    "input_mesh_path": "examples/sphere_z_offset.dat",
+    "input_mesh_path": "examples/tetrahedron.dat",
     "E_field_in": {
         # E-Field Amplitude, Direction [phi,theta], Polarization angle relative to phi and theta
         "amplitude": 1,
